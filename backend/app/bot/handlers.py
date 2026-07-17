@@ -61,24 +61,27 @@ def _confirmaciones(res: dict) -> list[dict]:
     ]
 
 
-async def _responder_interpretacion(update: Update, res: dict, prefijo: str = "") -> None:
-    """Envía la respuesta y, si hay borrados por confirmar, muestra botones."""
-    respuesta = res.get("respuesta") or "Hecho."
-    await update.message.reply_text(prefijo + respuesta)
-    for c in _confirmaciones(res):
-        teclado = InlineKeyboardMarkup(
-            [
+async def _responder_interpretacion(update: Update, res: dict) -> None:
+    """Si hay borrados por confirmar, muestra SOLO la pregunta con botones (el
+    texto del modelo puede afirmar erróneamente que ya borró). Si no, responde."""
+    confirmaciones = _confirmaciones(res)
+    if confirmaciones:
+        for c in confirmaciones:
+            teclado = InlineKeyboardMarkup(
                 [
-                    InlineKeyboardButton(
-                        "🗑️ Sí, borrar", callback_data=f"del:{c['tipo']}:{c['id']}"
-                    ),
-                    InlineKeyboardButton("Cancelar", callback_data="cancel"),
+                    [
+                        InlineKeyboardButton(
+                            "🗑️ Sí, borrar", callback_data=f"del:{c['tipo']}:{c['id']}"
+                        ),
+                        InlineKeyboardButton("Cancelar", callback_data="cancel"),
+                    ]
                 ]
-            ]
-        )
-        await update.message.reply_text(
-            f"¿Borrar {c['que']}?", reply_markup=teclado
-        )
+            )
+            await update.message.reply_text(
+                f"¿Seguro que quieres borrar {c['que']}?", reply_markup=teclado
+            )
+        return
+    await update.message.reply_text(res.get("respuesta") or "Hecho.")
 
 
 async def texto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
