@@ -22,11 +22,17 @@ from app.models.projects import Project
 from app.models.tasks import Task
 from app.schemas.finances import AccountCreate, TransactionCreate, TransactionTipo
 from app.schemas.notebooks import NotebookCreate
-from app.schemas.notes import NoteCreate, NoteUpdate
+from app.schemas.notes import NoteCreate, NoteLinkCreate, NoteUpdate
 from app.schemas.projects import ProjectCreate
 from app.schemas.reminders import ReminderCreate
 from app.schemas.responsibilities import ResponsibilityCreate
-from app.schemas.tasks import TaskCreate
+from app.schemas.tasks import (
+    ChecklistItemCreate,
+    ChecklistItemUpdate,
+    TaskCreate,
+    TaskEstado,
+    TaskUpdate,
+)
 from app.services import finances as fin
 from app.services import notebooks as nb_svc
 from app.services import notes as notes_svc
@@ -96,6 +102,20 @@ def _resolver_proyecto(db: Session, ref: str) -> Project:
 
 def _resolver_cuaderno(db: Session, ref: str) -> Notebook:
     return _resolver(db, Notebook, Notebook.nombre, ref, "un cuaderno")
+
+
+def _resolver_item(tarea: Task, ref: str):
+    """Encuentra un ítem del checklist de la tarea por su texto (ilike)."""
+    ref = (ref or "").strip().lower()
+    if not ref:
+        raise ValueError("Falta indicar el ítem del checklist.")
+    coincidencias = [i for i in tarea.checklist if ref in i.texto.lower()]
+    if not coincidencias:
+        raise ValueError(f"No encontré un ítem que coincida con «{ref}».")
+    if len(coincidencias) > 1:
+        textos = ", ".join(i.texto for i in coincidencias[:5])
+        raise ValueError(f"«{ref}» coincide con varios ítems: {textos}.")
+    return coincidencias[0]
 
 
 def _resolver_hoja(db: Session, ref: str) -> Note | None:
@@ -261,6 +281,108 @@ def _listar_tareas_pendientes(db: Session, a: dict) -> dict:
             for t in tareas
         ],
     }
+
+
+def _resumen_tarea(t: Task) -> dict:
+    return {"titulo": t.titulo, "estado": t.estado, "avance_pct": t.avance_pct}
+
+
+_FECHAS_TAREA = [
+    "fecha_limite",
+    "fecha_inicio_plan",
+    "fecha_inicio_real",
+    "fecha_fin_real",
+]
+
+
+def _editar_tarea(db: Session, a: dict) -> dict:
+    """Edita campos de una tarea (por su título): descripción, notas rápidas,
+    estado y fechas. `fecha_limite` es el fin planeado."""
+    tarea = _resolver_tarea(db, a["tarea"])
+    campos: dict[str, Any] = {}
+    if a.get("descripcion") is not None:
+        campos["descripcion"] = a["descripcion"]
+    if a.get("notas") is not None:
+        campos["notas"] = a["notas"]
+    if a.get("estado"):
+        campos["estado"] = TaskEstado(a["estado"])
+    for f in _FECHAS_TAREA:
+        if a.get(f):
+            campos[f] = date.fromisoformat(a[f])
+    if not campos:
+        raise ValueError("No indicaste qué cambiar de la tarea.")
+    t = task_svc.update_task(db, tarea.id, TaskUpdate(**campos))
+    return {"ok": True, **_resumen_tarea(t)}
+
+
+def _eliminar_tarea(db: Session, a: dict) -> dict:
+    tarea = _resolver_tarea(db, a["tarea"])
+    return {
+        "ok": True,
+        "confirmar": {
+            "tipo": "task",
+            "id": str(tarea.id),
+            "que": f"la tarea «{tarea.titulo}»",
+        },
+    }
+
+
+def _listar_tareas(db: Session, a: dict) -> dict:
+    project_id = _resolver_proyecto(db, a["proyecto"]).id if a.get("proyecto") else None
+    tareas = task_svc.list_tasks(db, project_id=project_id)
+    return {"ok": True, "tareas": [_resumen_tarea(t) for t in tareas]}
+
+
+def _tareas_de_hoy(db: Session, a: dict) -> dict:
+    return {"ok": True, "tareas": [_resumen_tarea(t) for t in task_svc.list_hoy(db)]}
+
+
+# --- Checklist de una tarea ---
+
+
+def _agregar_item_checklist(db: Session, a: dict) -> dict:
+    tarea = _resolver_tarea(db, a["tarea"])
+    t = task_svc.add_checklist_item(db, tarea.id, ChecklistItemCreate(texto=a["texto"]))
+    return {"ok": True, "tarea": t.titulo, "avance_pct": t.avance_pct}
+
+
+def _marcar_item_checklist(db: Session, a: dict) -> dict:
+    tarea = _resolver_tarea(db, a["tarea"])
+    t = task_svc.get_task(db, tarea.id)
+    item = _resolver_item(t, a["item"])
+    hecho = bool(a.get("hecho", True))
+    t = task_svc.update_checklist_item(db, item.id, ChecklistItemUpdate(hecho=hecho))
+    return {
+        "ok": True,
+        "item": item.texto,
+        "hecho": hecho,
+        "tarea": t.titulo,
+        "avance_pct": t.avance_pct,
+        "estado": t.estado,
+    }
+
+
+def _quitar_item_checklist(db: Session, a: dict) -> dict:
+    tarea = _resolver_tarea(db, a["tarea"])
+    t = task_svc.get_task(db, tarea.id)
+    item = _resolver_item(t, a["item"])
+    texto = item.texto  # guardar antes de borrar (el objeto queda inválido)
+    t = task_svc.delete_checklist_item(db, item.id)
+    return {"ok": True, "quitado": texto, "tarea": t.titulo}
+
+
+def _agregar_nota_a_tarea(db: Session, a: dict) -> dict:
+    """Crea una hoja y la vincula a la tarea (varias notas por tarea)."""
+    tarea = _resolver_tarea(db, a["tarea"])
+    nota = notes_svc.create_note(
+        db, NoteCreate(contenido=a["contenido"], titulo=a.get("titulo"))
+    )
+    notes_svc.add_link(
+        db,
+        nota.id,
+        NoteLinkCreate(entidad_tipo="task", entidad_id=tarea.id),
+    )
+    return {"ok": True, "tarea": tarea.titulo, "nota": _etiqueta_hoja(nota)}
 
 
 def _registrar_movimiento(db: Session, a: dict, tipo: TransactionTipo) -> dict:
@@ -462,6 +584,74 @@ TOOLS: list[Tool] = [
         "Lista las tareas que no están terminadas.",
         _p({}, []),
         _listar_tareas_pendientes,
+    ),
+    Tool(
+        "editar_tarea",
+        "Edita una tarea (por su título): descripción, notas rápidas, estado "
+        "(planeada|en_ejecucion|en_pausa|terminada) y fechas en YYYY-MM-DD "
+        "(fecha_limite = fin planeado; también fecha_inicio_plan, fecha_inicio_real, "
+        "fecha_fin_real).",
+        _p(
+            {
+                "tarea": _STR,
+                "descripcion": _STR,
+                "notas": _STR,
+                "estado": _STR,
+                "fecha_limite": _STR,
+                "fecha_inicio_plan": _STR,
+                "fecha_inicio_real": _STR,
+                "fecha_fin_real": _STR,
+            },
+            ["tarea"],
+        ),
+        _editar_tarea,
+    ),
+    Tool(
+        "eliminar_tarea",
+        "Elimina una tarea (por su título). Pide confirmación antes de borrar.",
+        _p({"tarea": _STR}, ["tarea"]),
+        _eliminar_tarea,
+    ),
+    Tool(
+        "listar_tareas",
+        "Lista las tareas de un proyecto (o todas si no se indica proyecto).",
+        _p({"proyecto": _STR}, []),
+        _listar_tareas,
+    ),
+    Tool(
+        "tareas_de_hoy",
+        "Lista las tareas que vencen hoy o están vencidas y sin terminar.",
+        _p({}, []),
+        _tareas_de_hoy,
+    ),
+    Tool(
+        "agregar_item_checklist",
+        "Añade un ítem (paso) al checklist de una tarea (por su título).",
+        _p({"tarea": _STR, "texto": _STR}, ["tarea", "texto"]),
+        _agregar_item_checklist,
+    ),
+    Tool(
+        "marcar_item_checklist",
+        "Marca (hecho=true) o desmarca (hecho=false) un ítem del checklist de una "
+        "tarea. El ítem se identifica por su texto. Al 100% la tarea se termina sola.",
+        _p(
+            {"tarea": _STR, "item": _STR, "hecho": {"type": "boolean"}},
+            ["tarea", "item"],
+        ),
+        _marcar_item_checklist,
+    ),
+    Tool(
+        "quitar_item_checklist",
+        "Quita un ítem del checklist de una tarea (identificado por su texto).",
+        _p({"tarea": _STR, "item": _STR}, ["tarea", "item"]),
+        _quitar_item_checklist,
+    ),
+    Tool(
+        "agregar_nota_a_tarea",
+        "Crea una hoja (nota) y la vincula a una tarea. Para dejar apuntes ricos y "
+        "buscables asociados a la tarea. Título opcional.",
+        _p({"tarea": _STR, "contenido": _STR, "titulo": _STR}, ["tarea", "contenido"]),
+        _agregar_nota_a_tarea,
     ),
     Tool(
         "registrar_gasto",
