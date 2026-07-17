@@ -1,0 +1,132 @@
+<style>
+#erd svg.erDiagram .divider path { stroke-opacity: 0.5; }
+#erd svg.erDiagram .row-rect-odd path,
+#erd svg.erDiagram .row-rect-odd rect,
+#erd svg.erDiagram .row-rect-even path,
+#erd svg.erDiagram .row-rect-even rect { stroke: none !important; }
+</style>
+<h2 class="sr-only">Modelo de datos de Puiky: proyectos, tareas, notas con vínculos polimórficos, responsabilidades, recordatorios, cuentas, categorías, movimientos y presupuestos.</h2>
+<div id="erd"></div>
+<script type="module">
+import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+await document.fonts.ready;
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  fontFamily: '"Anthropic Sans", sans-serif',
+  themeVariables: {
+    darkMode: dark,
+    fontSize: '13px',
+    fontFamily: '"Anthropic Sans", sans-serif',
+    lineColor: dark ? '#9c9a92' : '#73726c',
+    textColor: dark ? '#c2c0b6' : '#3d3d3a',
+  },
+});
+const { svg } = await mermaid.render('erd-svg', `erDiagram
+  PROJECT ||--o{ TASK : contiene
+  PROJECT ||--o{ NOTE_LINK : referida_por
+  TASK ||--o{ NOTE_LINK : referida_por
+  RESPONSIBILITY ||--o{ NOTE_LINK : referida_por
+  ACCOUNT ||--o{ NOTE_LINK : referida_por
+  NOTE ||--o{ NOTE_LINK : apunta_a
+  TASK ||--o{ REMINDER : genera
+  RESPONSIBILITY ||--o{ REMINDER : genera
+  BUDGET ||--o{ REMINDER : genera
+  ACCOUNT ||--o{ TRANSACTION : registra
+  CATEGORY ||--o{ TRANSACTION : clasifica
+  CATEGORY ||--o{ BUDGET : limita
+  PROJECT {
+    uuid id PK
+    string nombre
+    text descripcion
+    string estado
+  }
+  TASK {
+    uuid id PK
+    uuid project_id FK
+    string titulo
+    string estado
+    int avance_pct
+    date fecha_limite
+  }
+  NOTE {
+    uuid id PK
+    text contenido
+    vector embedding
+    timestamp creada
+  }
+  NOTE_LINK {
+    uuid id PK
+    uuid note_id FK
+    string entidad_tipo
+    uuid entidad_id
+  }
+  RESPONSIBILITY {
+    uuid id PK
+    string nombre
+    string recurrencia
+    date proximo_venc
+    numeric monto
+  }
+  REMINDER {
+    uuid id PK
+    string origen_tipo
+    uuid origen_id
+    text texto
+    timestamp disparar_en
+    int veces_avisado
+    timestamp pospuesto_para
+    bool resuelto
+  }
+  ACCOUNT {
+    uuid id PK
+    string nombre
+    string tipo
+    numeric saldo
+  }
+  CATEGORY {
+    uuid id PK
+    string nombre
+    bool activa
+  }
+  TRANSACTION {
+    uuid id PK
+    string tipo
+    numeric monto
+    uuid account_id FK
+    uuid cuenta_destino_id FK
+    uuid category_id FK
+    date fecha
+    text nota
+  }
+  BUDGET {
+    uuid id PK
+    uuid category_id FK
+    numeric tope
+    string periodo
+  }`);
+document.getElementById('erd').innerHTML = svg;
+document.querySelectorAll('#erd svg.erDiagram .node').forEach(node => {
+  const firstPath = node.querySelector('path[d]');
+  if (!firstPath) return;
+  const d = firstPath.getAttribute('d');
+  const nums = d.match(/-?[\d.]+/g)?.map(Number);
+  if (!nums || nums.length < 8) return;
+  const xs = [nums[0], nums[2], nums[4], nums[6]];
+  const ys = [nums[1], nums[3], nums[5], nums[7]];
+  const x = Math.min(...xs), y = Math.min(...ys);
+  const w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.setAttribute('x', x); rect.setAttribute('y', y);
+  rect.setAttribute('width', w); rect.setAttribute('height', h);
+  rect.setAttribute('rx', '8');
+  for (const a of ['fill', 'stroke', 'stroke-width', 'class', 'style']) {
+    if (firstPath.hasAttribute(a)) rect.setAttribute(a, firstPath.getAttribute(a));
+  }
+  firstPath.replaceWith(rect);
+});
+document.querySelectorAll('#erd svg.erDiagram .row-rect-odd path, #erd svg.erDiagram .row-rect-even path').forEach(p => {
+  p.setAttribute('stroke', 'none');
+});
+</script>

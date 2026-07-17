@@ -1,0 +1,3 @@
+# Normaliza finales de línea a LF en el repo y en el checkout.
+# Clave para portabilidad Windows (desarrollo) → Ubuntu (producción).
+* text=auto eol=lf

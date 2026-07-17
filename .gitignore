@@ -1,0 +1,25 @@
+# Secretos y configuración local
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Modelos de embeddings descargados (cache de HuggingFace)
+.cache/
+
+# Frontend (Fase 5)
+node_modules/
+dist/
+
+# IDE / SO
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
