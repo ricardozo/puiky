@@ -15,7 +15,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.finances import Category
+from app.models.finances import Account, Category
+from app.models.projects import Project
 from app.nlu.provider import LLMProvider, get_llm_provider
 from app.nlu.tools import dispatch, openai_tools
 
@@ -41,6 +42,16 @@ def _system_prompt(db: Session) -> str:
             select(Category).where(Category.activa.is_(True)).order_by(Category.nombre)
         ).scalars()
     ]
+    cuentas = [
+        a.nombre
+        for a in db.execute(select(Account).order_by(Account.nombre)).scalars()
+    ]
+    proyectos = [
+        p.nombre
+        for p in db.execute(
+            select(Project).where(Project.estado != "terminado").order_by(Project.nombre)
+        ).scalars()
+    ]
     return (
         "Eres Puiky, un asistente personal. Interpretas lo que dice el usuario y "
         "usas las herramientas para actuar sobre sus notas, tareas, proyectos, "
@@ -50,8 +61,11 @@ def _system_prompt(db: Session) -> str:
         f"- Categorías disponibles: {', '.join(categorias) or '(ninguna)'}. Mapea "
         "expresiones libres (p. ej. 'mercado', 'súper') a la categoría más "
         "adecuada de esa lista; si ninguna aplica, usa 'Otros'.\n"
-        "- Si falta un dato imprescindible (p. ej. de qué cuenta sale un gasto), "
-        "pídelo en vez de inventarlo.\n"
+        f"- Cuentas del usuario: {', '.join(cuentas) or '(ninguna)'}. Si menciona "
+        "una (p. ej. 'efectivo', 'ahorros'), úsala directamente sin preguntar.\n"
+        f"- Proyectos activos: {', '.join(proyectos) or '(ninguno)'}.\n"
+        "- Pide un dato solo si de verdad falta y no puedes deducirlo del contexto "
+        "anterior; no preguntes por algo que el usuario ya dijo.\n"
         "- Puedes ejecutar varias acciones si el usuario menciona varias.\n"
         "- Responde en español, breve y natural, confirmando lo hecho."
     )
