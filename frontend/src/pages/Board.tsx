@@ -233,6 +233,8 @@ function TaskEditor({
 }) {
   const [task, setTask] = useState<Task>(taskInicial)
   const [titulo, setTitulo] = useState(taskInicial.titulo)
+  const [desc, setDesc] = useState(taskInicial.descripcion ?? '')
+  const [notas, setNotas] = useState(taskInicial.notas ?? '')
   const [nuevoItem, setNuevoItem] = useState('')
 
   const guardar = async (patch: Record<string, unknown>) => {
@@ -309,6 +311,18 @@ function TaskEditor({
           )}
         </div>
 
+        <label className="text-xs text-slate-400 flex flex-col gap-1">
+          Descripción
+          <textarea
+            value={desc}
+            onChange={(e) => setDesc(e.target.value)}
+            onBlur={() => guardar({ descripcion: desc.trim() || null })}
+            rows={3}
+            placeholder="¿De qué trata la tarea?"
+            className="rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-slate-100 outline-none focus:border-indigo-500"
+          />
+        </label>
+
         <div className="grid grid-cols-2 gap-3">
           <Fecha
             label="Inicio planeado"
@@ -376,6 +390,18 @@ function TaskEditor({
             </button>
           </div>
         </div>
+
+        <label className="text-xs text-slate-400 flex flex-col gap-1">
+          Notas
+          <textarea
+            value={notas}
+            onChange={(e) => setNotas(e.target.value)}
+            onBlur={() => guardar({ notas: notas.trim() || null })}
+            rows={3}
+            placeholder="Apuntes, avances, recordatorios…"
+            className="rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-slate-100 outline-none focus:border-indigo-500"
+          />
+        </label>
 
         <div className="pt-2 border-t border-slate-800">
           <button

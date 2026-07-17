@@ -18,6 +18,8 @@ class TaskEstado(str, Enum):
 
 class TaskCreate(BaseModel):
     titulo: str = Field(min_length=1, max_length=300)
+    descripcion: str | None = None
+    notas: str | None = None
     project_id: uuid.UUID | None = None
     estado: TaskEstado = TaskEstado.planeada
     avance_pct: int = Field(default=0, ge=0, le=100)
@@ -33,6 +35,8 @@ class TaskUpdate(BaseModel):
     """
 
     titulo: str | None = Field(default=None, min_length=1, max_length=300)
+    descripcion: str | None = None
+    notas: str | None = None
     project_id: uuid.UUID | None = None
     estado: TaskEstado | None = None
     avance_pct: int | None = Field(default=None, ge=0, le=100)
@@ -73,6 +77,8 @@ class TaskOut(BaseModel):
     id: uuid.UUID
     project_id: uuid.UUID | None
     titulo: str
+    descripcion: str | None
+    notas: str | None
     estado: str
     avance_pct: int
     fecha_limite: date | None

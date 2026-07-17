@@ -11,6 +11,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Text,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -37,6 +38,8 @@ class Task(Base):
         nullable=True,
     )
     titulo: Mapped[str] = mapped_column(String(300), nullable=False)
+    descripcion: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notas: Mapped[str | None] = mapped_column(Text, nullable=True)
     # planeada / en_ejecucion / en_pausa / terminada
     estado: Mapped[str] = mapped_column(
         String(20), nullable=False, server_default=text("'planeada'")

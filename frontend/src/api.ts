@@ -87,6 +87,8 @@ export interface Task {
   id: string
   project_id: string | null
   titulo: string
+  descripcion: string | null
+  notas: string | null
   estado: string
   avance_pct: number
   fecha_limite: string | null
@@ -97,6 +99,8 @@ export interface Task {
 }
 export interface TaskFechas {
   titulo?: string
+  descripcion?: string | null
+  notas?: string | null
   fecha_limite?: string | null
   fecha_inicio_plan?: string | null
   fecha_inicio_real?: string | null

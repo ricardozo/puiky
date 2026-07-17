@@ -48,6 +48,8 @@ def create_task(db: Session, data: TaskCreate) -> Task:
     _validar_proyecto(db, data.project_id)
     task = Task(
         titulo=data.titulo,
+        descripcion=data.descripcion,
+        notas=data.notas,
         project_id=data.project_id,
         estado=data.estado.value,
         avance_pct=data.avance_pct,
