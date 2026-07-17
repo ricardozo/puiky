@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # --- Embeddings ---
     embedding_model: str = "intfloat/multilingual-e5-base"
     embedding_dim: int = 768
+    # Backend de embeddings: "real" (sentence-transformers) o "fake"
+    # (vector determinista sin torch, para tests/CI y arranque rápido).
+    embed_backend: str = "real"
 
     @computed_field  # type: ignore[prop-decorator]
     @property
