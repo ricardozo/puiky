@@ -1,0 +1,43 @@
+# Orquesta Postgres (con pgvector) y la app. Idéntico en Windows y Ubuntu.
+# Levantar todo:  docker compose up --build
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      # Dentro de la red de compose, la BD es el servicio "db", no localhost
+      POSTGRES_HOST: db
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    volumes:
+      # Código montado para recarga en caliente durante el desarrollo
+      - ./backend:/app
+      # Preserva el venv del contenedor (no lo pisa el montaje anterior)
+      - /app/.venv
+      # Cache de modelos de embeddings: se descarga una vez y persiste
+      - hf_cache:/root/.cache/huggingface
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+volumes:
+  pg_data:
+  hf_cache:
