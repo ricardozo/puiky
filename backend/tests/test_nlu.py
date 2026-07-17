@@ -23,8 +23,8 @@ def test_tools_formato_openai() -> None:
 
 
 def test_fake_reconoce_intenciones() -> None:
-    assert _tool_de("anota que debo llamar al banco") == "crear_nota"
-    assert _tool_de("busca sobre facturación") == "buscar_notas"
+    assert _tool_de("anota que debo llamar al banco") == "crear_hoja"
+    assert _tool_de("busca sobre facturación") == "buscar_hojas"
     assert _tool_de("gasté 12000 en comida con efectivo") == "registrar_gasto"
     assert _tool_de("cuánto tengo en ahorros") == "consultar_saldo"
     assert _tool_de("recuérdame llamar a Juan el viernes") == "crear_recordatorio"

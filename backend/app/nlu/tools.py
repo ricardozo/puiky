@@ -16,15 +16,19 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.finances import Account, Category
+from app.models.notebooks import Notebook
+from app.models.notes import Note
 from app.models.projects import Project
 from app.models.tasks import Task
 from app.schemas.finances import AccountCreate, TransactionCreate, TransactionTipo
-from app.schemas.notes import NoteCreate
+from app.schemas.notebooks import NotebookCreate
+from app.schemas.notes import NoteCreate, NoteUpdate
 from app.schemas.projects import ProjectCreate
 from app.schemas.reminders import ReminderCreate
 from app.schemas.responsibilities import ResponsibilityCreate
 from app.schemas.tasks import TaskCreate
 from app.services import finances as fin
+from app.services import notebooks as nb_svc
 from app.services import notes as notes_svc
 from app.services import projects as proj_svc
 from app.services import reminders as rem_svc
@@ -90,26 +94,131 @@ def _resolver_proyecto(db: Session, ref: str) -> Project:
     return _resolver(db, Project, Project.nombre, ref, "un proyecto")
 
 
+def _resolver_cuaderno(db: Session, ref: str) -> Notebook:
+    return _resolver(db, Notebook, Notebook.nombre, ref, "un cuaderno")
+
+
+def _resolver_hoja(db: Session, ref: str) -> Note | None:
+    """Busca una hoja por su título (ilike). None si no existe; error si varias."""
+    ref = (ref or "").strip()
+    if not ref:
+        raise ValueError("Falta indicar la hoja.")
+    filas = list(
+        db.execute(select(Note).where(Note.titulo.ilike(f"%{ref}%"))).scalars().all()
+    )
+    if len(filas) == 1:
+        return filas[0]
+    if len(filas) > 1:
+        titulos = ", ".join(f.titulo for f in filas[:5] if f.titulo)
+        raise ValueError(f"«{ref}» coincide con varias hojas: {titulos}.")
+    return None
+
+
+def _etiqueta_hoja(n: Note) -> str:
+    return n.titulo or n.contenido[:40]
+
+
 def _money(v: Any) -> str:
     return f"{float(v):.2f}"
 
 
-# --- Handlers ---
+# --- Handlers: hojas y cuadernos ---
 
 
-def _crear_nota(db: Session, a: dict) -> dict:
-    nota = notes_svc.create_note(db, NoteCreate(contenido=a["contenido"]))
-    return {"ok": True, "nota_id": str(nota.id), "contenido": nota.contenido}
+def _crear_hoja(db: Session, a: dict) -> dict:
+    nb_id = _resolver_cuaderno(db, a["cuaderno"]).id if a.get("cuaderno") else None
+    nota = notes_svc.create_note(
+        db,
+        NoteCreate(
+            contenido=a["contenido"], titulo=a.get("titulo"), notebook_id=nb_id
+        ),
+    )
+    return {"ok": True, "hoja": _etiqueta_hoja(nota), "cuaderno": a.get("cuaderno")}
 
 
-def _buscar_notas(db: Session, a: dict) -> dict:
+def _anadir_a_hoja(db: Session, a: dict) -> dict:
+    """Añade texto a una hoja existente (por título); si no existe, la crea."""
+    hoja = _resolver_hoja(db, a["hoja"])
+    if hoja is None:
+        nota = notes_svc.create_note(
+            db, NoteCreate(contenido=a["texto"], titulo=a["hoja"])
+        )
+        return {"ok": True, "creada": True, "hoja": _etiqueta_hoja(nota)}
+    notes_svc.append_note(db, hoja.id, a["texto"])
+    return {"ok": True, "creada": False, "hoja": _etiqueta_hoja(hoja)}
+
+
+def _editar_hoja(db: Session, a: dict) -> dict:
+    hoja = _resolver_hoja(db, a["hoja"])
+    if hoja is None:
+        raise ValueError(f"No encontré la hoja «{a['hoja']}».")
+    campos: dict[str, Any] = {}
+    if a.get("nuevo_titulo") is not None:
+        campos["titulo"] = a["nuevo_titulo"]
+    if a.get("nuevo_contenido") is not None:
+        campos["contenido"] = a["nuevo_contenido"]
+    notes_svc.update_note(db, hoja.id, NoteUpdate(**campos))
+    return {"ok": True, "hoja": campos.get("titulo") or _etiqueta_hoja(hoja)}
+
+
+def _mover_hoja(db: Session, a: dict) -> dict:
+    hoja = _resolver_hoja(db, a["hoja"])
+    if hoja is None:
+        raise ValueError(f"No encontré la hoja «{a['hoja']}».")
+    nb = _resolver_cuaderno(db, a["cuaderno"])
+    notes_svc.update_note(db, hoja.id, NoteUpdate(notebook_id=nb.id))
+    return {"ok": True, "hoja": _etiqueta_hoja(hoja), "cuaderno": nb.nombre}
+
+
+def _eliminar_hoja(db: Session, a: dict) -> dict:
+    """No borra: pide confirmación (el bot mostrará botones)."""
+    hoja = _resolver_hoja(db, a["hoja"])
+    if hoja is None:
+        raise ValueError(f"No encontré la hoja «{a['hoja']}».")
+    return {
+        "ok": True,
+        "confirmar": {
+            "tipo": "note",
+            "id": str(hoja.id),
+            "que": f"la hoja «{_etiqueta_hoja(hoja)}»",
+        },
+    }
+
+
+def _buscar_hojas(db: Session, a: dict) -> dict:
     res = notes_svc.search_notes(db, a["texto"], int(a.get("limite", 5)))
     return {
         "ok": True,
         "resultados": [
-            {"contenido": n.contenido, "similitud": round(s, 3)} for n, s in res
+            {"hoja": _etiqueta_hoja(n), "similitud": round(s, 3)} for n, s in res
         ],
     }
+
+
+def _listar_hojas(db: Session, a: dict) -> dict:
+    if a.get("cuaderno"):
+        nb = _resolver_cuaderno(db, a["cuaderno"])
+        notas = notes_svc.list_notes(db, notebook_id=nb.id)
+    else:
+        notas = notes_svc.list_notes(db)
+    return {"ok": True, "hojas": [_etiqueta_hoja(n) for n in notas]}
+
+
+def _crear_cuaderno(db: Session, a: dict) -> dict:
+    nb = nb_svc.create_notebook(db, NotebookCreate(nombre=a["nombre"]))
+    return {"ok": True, "cuaderno": nb.nombre}
+
+
+def _listar_cuadernos(db: Session, a: dict) -> dict:
+    return {
+        "ok": True,
+        "cuadernos": [
+            {"nombre": nb.nombre, "notas": n} for nb, n in nb_svc.list_notebooks(db)
+        ],
+    }
+
+
+# --- Handlers: resto ---
 
 
 def _crear_proyecto(db: Session, a: dict) -> dict:
@@ -261,18 +370,66 @@ _STR = {"type": "string"}
 _NUM = {"type": "number"}
 
 TOOLS: list[Tool] = [
+    # --- Hojas (notas) y cuadernos ---
     Tool(
-        "crear_nota",
-        "Guarda una nota de texto libre en el segundo cerebro.",
-        _p({"contenido": _STR}, ["contenido"]),
-        _crear_nota,
+        "crear_hoja",
+        "Crea una hoja (nota) en el segundo cerebro. Título y cuaderno son opcionales.",
+        _p({"contenido": _STR, "titulo": _STR, "cuaderno": _STR}, ["contenido"]),
+        _crear_hoja,
     ),
     Tool(
-        "buscar_notas",
-        "Busca notas por significado (búsqueda semántica), no por palabra exacta.",
+        "anadir_a_hoja",
+        "Añade texto al cuerpo de una hoja existente (identificada por su título). "
+        "Si no existe una hoja con ese título, la crea con ese título.",
+        _p({"hoja": _STR, "texto": _STR}, ["hoja", "texto"]),
+        _anadir_a_hoja,
+    ),
+    Tool(
+        "editar_hoja",
+        "Edita el título y/o el cuerpo de una hoja existente (por su título actual).",
+        _p(
+            {"hoja": _STR, "nuevo_titulo": _STR, "nuevo_contenido": _STR},
+            ["hoja"],
+        ),
+        _editar_hoja,
+    ),
+    Tool(
+        "mover_hoja",
+        "Mueve una hoja a un cuaderno.",
+        _p({"hoja": _STR, "cuaderno": _STR}, ["hoja", "cuaderno"]),
+        _mover_hoja,
+    ),
+    Tool(
+        "eliminar_hoja",
+        "Elimina una hoja (por su título). Pide confirmación antes de borrar.",
+        _p({"hoja": _STR}, ["hoja"]),
+        _eliminar_hoja,
+    ),
+    Tool(
+        "buscar_hojas",
+        "Busca hojas por significado (búsqueda semántica), no por palabra exacta.",
         _p({"texto": _STR, "limite": {"type": "integer"}}, ["texto"]),
-        _buscar_notas,
+        _buscar_hojas,
     ),
+    Tool(
+        "listar_hojas",
+        "Lista las hojas de un cuaderno (o todas si no se indica cuaderno).",
+        _p({"cuaderno": _STR}, []),
+        _listar_hojas,
+    ),
+    Tool(
+        "crear_cuaderno",
+        "Crea un cuaderno para agrupar hojas.",
+        _p({"nombre": _STR}, ["nombre"]),
+        _crear_cuaderno,
+    ),
+    Tool(
+        "listar_cuadernos",
+        "Lista los cuadernos y cuántas hojas tiene cada uno.",
+        _p({}, []),
+        _listar_cuadernos,
+    ),
+    # --- Proyectos y tareas ---
     Tool(
         "crear_proyecto",
         "Crea un proyecto que agrupa tareas y notas.",

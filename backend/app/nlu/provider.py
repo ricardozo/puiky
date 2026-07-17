@@ -109,7 +109,13 @@ class FakeLLMProvider:
     def _interpretar(self, texto: str, t: str) -> ToolCall | None:
         if any(k in t for k in ["busca", "buscar", "qué pensé", "que pense"]):
             q = _despues_de(texto, ["sobre", "acerca de", "busca", "buscar"]) or texto
-            return ToolCall("buscar_notas", {"texto": q})
+            return ToolCall("buscar_hojas", {"texto": q})
+
+        if any(k in t for k in ["añade a la hoja", "agrega a la hoja", "en la hoja"]):
+            hoja = _despues_de(texto, ["hoja"]) or ""
+            hoja = hoja.split(":")[0].split(" añade")[0].split(" agrega")[0].strip()
+            texto_add = texto.split(":", 1)[1].strip() if ":" in texto else texto
+            return ToolCall("anadir_a_hoja", {"hoja": hoja, "texto": texto_add})
 
         if any(k in t for k in ["recuérdame", "recuerdame", "recordarme"]):
             return ToolCall("crear_recordatorio", {"texto": texto})
@@ -145,8 +151,8 @@ class FakeLLMProvider:
                 {"nombre": _despues_de(texto, ["proyecto"]) or texto},
             )
 
-        if any(k in t for k in ["nota", "anota", "apunta"]):
-            return ToolCall("crear_nota", {"contenido": texto})
+        if any(k in t for k in ["nota", "anota", "apunta", "hoja"]):
+            return ToolCall("crear_hoja", {"contenido": texto})
 
         return None
 

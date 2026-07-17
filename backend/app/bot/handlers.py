@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from telegram import Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
@@ -52,16 +52,66 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(BIENVENIDA, parse_mode="Markdown")
 
 
+def _confirmaciones(res: dict) -> list[dict]:
+    """Extrae las peticiones de confirmación de borrado del resultado."""
+    return [
+        a["resultado"]["confirmar"]
+        for a in res.get("acciones", [])
+        if isinstance(a.get("resultado"), dict) and a["resultado"].get("confirmar")
+    ]
+
+
+async def _responder_interpretacion(update: Update, res: dict, prefijo: str = "") -> None:
+    """Envía la respuesta y, si hay borrados por confirmar, muestra botones."""
+    respuesta = res.get("respuesta") or "Hecho."
+    await update.message.reply_text(prefijo + respuesta)
+    for c in _confirmaciones(res):
+        teclado = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "🗑️ Sí, borrar", callback_data=f"del:{c['tipo']}:{c['id']}"
+                    ),
+                    InlineKeyboardButton("Cancelar", callback_data="cancel"),
+                ]
+            ]
+        )
+        await update.message.reply_text(
+            f"¿Borrar {c['que']}?", reply_markup=teclado
+        )
+
+
 async def texto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if await _bloquear_no_autorizado(update):
         return
     await update.effective_chat.send_action(ChatAction.TYPING)
     try:
         res = await _client.interpret(update.message.text)
-        await update.message.reply_text(res.get("respuesta") or "Hecho.")
+        await _responder_interpretacion(update, res)
     except Exception:
         logger.exception("Error interpretando texto")
         await update.message.reply_text("Ups, tuve un problema procesando eso.")
+
+
+async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Maneja los botones de confirmación de borrado."""
+    q = update.callback_query
+    await q.answer()
+    uid = q.from_user.id if q.from_user else None
+    if not esta_autorizado(uid, get_settings().allowed_ids):
+        return
+    data = q.data or ""
+    if data == "cancel":
+        await q.edit_message_text("Cancelado.")
+        return
+    if data.startswith("del:"):
+        _, tipo, entidad_id = data.split(":", 2)
+        try:
+            await _client.delete_entity(tipo, entidad_id)
+            await q.edit_message_text("🗑️ Borrado.")
+        except Exception:
+            logger.exception("Error borrando %s %s", tipo, entidad_id)
+            await q.edit_message_text("No pude borrar eso.")
 
 
 async def voz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -74,10 +124,8 @@ async def voz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         audio = bytes(await archivo.download_as_bytearray())
         res = await _client.voice(audio)
         transcrito = res.get("texto", "")
-        respuesta = res.get("respuesta") or "Hecho."
-        await update.message.reply_text(
-            f"🎙️ _{transcrito}_\n\n{respuesta}", parse_mode="Markdown"
-        )
+        await update.message.reply_text(f"🎙️ _{transcrito}_", parse_mode="Markdown")
+        await _responder_interpretacion(update, res)
     except Exception:
         logger.exception("Error procesando audio")
         await update.message.reply_text("Ups, no pude procesar el audio.")
