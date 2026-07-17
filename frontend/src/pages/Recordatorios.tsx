@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { aISOColombia, api, type Reminder } from '../api'
+import { aISOColombia, api, ApiError, type Reminder } from '../api'
 
 const inputCls =
   'rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 outline-none focus:border-indigo-500'
@@ -22,6 +22,7 @@ export default function Recordatorios() {
   const [verResueltos, setVerResueltos] = useState(false)
   const [texto, setTexto] = useState('')
   const [cuando, setCuando] = useState('')
+  const [error, setError] = useState('')
   const [cargando, setCargando] = useState(true)
 
   const cargar = () =>
@@ -37,11 +38,21 @@ export default function Recordatorios() {
 
   const crear = async (e: FormEvent) => {
     e.preventDefault()
+    setError('')
     if (!texto.trim() || !cuando) return
-    await api.createReminder(texto.trim(), aISOColombia(cuando))
-    setTexto('')
-    setCuando('')
-    cargar()
+    const anio = Number(cuando.slice(0, 4))
+    if (anio < 2000 || anio > 9999) {
+      setError('La fecha no es válida.')
+      return
+    }
+    try {
+      await api.createReminder(texto.trim(), aISOColombia(cuando))
+      setTexto('')
+      setCuando('')
+      cargar()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Error al crear')
+    }
   }
 
   const ahora = Date.now()
@@ -71,12 +82,15 @@ export default function Recordatorios() {
           value={cuando}
           onChange={(e) => setCuando(e.target.value)}
           type="datetime-local"
+          min="2000-01-01T00:00"
+          max="9999-12-31T23:59"
           className={inputCls}
         />
         <button className="rounded-lg bg-indigo-600 hover:bg-indigo-500 px-4 font-medium">
           Crear
         </button>
       </form>
+      {error && <p className="text-red-400 text-sm">{error}</p>}
 
       {cargando ? (
         <p className="text-slate-500">Cargando…</p>

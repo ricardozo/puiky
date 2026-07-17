@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { api, fmtMoney, type Responsibility } from '../api'
+import { api, ApiError, fmtMoney, type Responsibility } from '../api'
 
 const inputCls =
   'rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 outline-none focus:border-indigo-500'
@@ -12,6 +12,7 @@ export default function Responsabilidades() {
   const [recurrencia, setRecurrencia] = useState('mensual')
   const [venc, setVenc] = useState('')
   const [monto, setMonto] = useState('')
+  const [error, setError] = useState('')
   const [cargando, setCargando] = useState(true)
 
   const cargar = () =>
@@ -23,17 +24,27 @@ export default function Responsabilidades() {
 
   const crear = async (e: FormEvent) => {
     e.preventDefault()
+    setError('')
     if (!nombre.trim() || !venc) return
-    await api.createResponsibility(
-      nombre.trim(),
-      recurrencia,
-      venc,
-      monto ? Number(monto) : null
-    )
-    setNombre('')
-    setVenc('')
-    setMonto('')
-    cargar()
+    const anio = Number(venc.slice(0, 4))
+    if (anio < 2000 || anio > 9999) {
+      setError('La fecha de vencimiento no es válida.')
+      return
+    }
+    try {
+      await api.createResponsibility(
+        nombre.trim(),
+        recurrencia,
+        venc,
+        monto ? Number(monto) : null
+      )
+      setNombre('')
+      setVenc('')
+      setMonto('')
+      cargar()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Error al crear')
+    }
   }
 
   return (
@@ -62,6 +73,8 @@ export default function Responsabilidades() {
           value={venc}
           onChange={(e) => setVenc(e.target.value)}
           type="date"
+          min="2000-01-01"
+          max="9999-12-31"
           className={inputCls}
         />
         <input
@@ -75,6 +88,7 @@ export default function Responsabilidades() {
           Crear
         </button>
       </form>
+      {error && <p className="text-red-400 text-sm">{error}</p>}
 
       {cargando ? (
         <p className="text-slate-500">Cargando…</p>

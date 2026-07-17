@@ -31,7 +31,15 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   if (res.status === 204) return undefined as T
   const data = await res.json().catch(() => null)
   if (!res.ok) {
-    throw new ApiError(res.status, (data && data.detail) || res.statusText)
+    let msg = res.statusText
+    const detail = data?.detail
+    if (typeof detail === 'string') msg = detail
+    else if (Array.isArray(detail))
+      msg = detail
+        .map((e: { msg?: string }) => e.msg)
+        .filter(Boolean)
+        .join('; ')
+    throw new ApiError(res.status, msg)
   }
   return data as T
 }
