@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -19,6 +18,7 @@ from app.models.finances import Account, Category
 from app.models.projects import Project
 from app.nlu.provider import LLMProvider, get_llm_provider
 from app.nlu.tools import dispatch, openai_tools
+from app.timeutils import now_local
 
 
 @dataclass
@@ -35,7 +35,7 @@ class InterpretResult:
 
 
 def _system_prompt(db: Session) -> str:
-    ahora = datetime.now().astimezone().isoformat(timespec="minutes")
+    ahora = now_local().isoformat(timespec="minutes")
     categorias = [
         c.nombre
         for c in db.execute(
@@ -56,8 +56,9 @@ def _system_prompt(db: Session) -> str:
         "Eres Puiky, un asistente personal. Interpretas lo que dice el usuario y "
         "usas las herramientas para actuar sobre sus notas, tareas, proyectos, "
         "finanzas y recordatorios.\n"
-        f"- Fecha y hora actual: {ahora}. Úsala para convertir expresiones como "
-        "'mañana' o 'el viernes' a fechas/horas ISO 8601.\n"
+        f"- Fecha y hora actual: {ahora} (hora de Colombia). Úsala para convertir "
+        "expresiones como 'mañana' o 'el viernes' a fechas/horas, y expresa "
+        "siempre las fechas en ISO 8601 con el offset -05:00.\n"
         f"- Categorías disponibles: {', '.join(categorias) or '(ninguna)'}. Mapea "
         "expresiones libres (p. ej. 'mercado', 'súper') a la categoría más "
         "adecuada de esa lista; si ninguna aplica, usa 'Otros'.\n"

@@ -55,6 +55,28 @@ class Settings(BaseSettings):
             int(x) for x in self.telegram_allowed_ids.split(",") if x.strip().isdigit()
         }
 
+    # --- Zona horaria (Fase 4) ---
+    timezone: str = "America/Bogota"
+
+    # --- Scheduler (Fase 4) ---
+    scheduler_poll_seconds: int = 60
+    # Insistencia: cada cuántas horas se reitera un recordatorio sin resolver.
+    reminder_realert_hours: int = 3
+    # Anticipación escalonada (días antes del vencimiento), separada por coma.
+    reminder_anticipation_days: str = "3,1,0"
+    # Hora local a la que se disparan los avisos de vencimiento.
+    reminder_hour: int = 9
+    # Umbral de alerta de presupuesto (0.9 = 90% del tope).
+    budget_alert_threshold: float = 0.9
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def anticipation_days(self) -> list[int]:
+        dias = {
+            int(x) for x in self.reminder_anticipation_days.split(",") if x.strip().isdigit()
+        }
+        return sorted(dias, reverse=True)
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def database_url(self) -> str:

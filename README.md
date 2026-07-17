@@ -15,8 +15,11 @@ con transferencias, reportes de gasto, presupuestos con avance) y **recordatorio
 (posponer, resolver, vencidos). **NLU**: lenguaje natural → acciones, con Qwen
 (Ollama) intercambiable por un intérprete `fake`, y audio→texto con Whisper.
 **Telegram (Fase 3)**: bot con long-polling que recibe texto y audio, los pasa
-por la NLU y responde; seguridad por allowlist de IDs. Pendientes: entidad USER +
-autenticación web, scheduler (recordatorios proactivos) y frontend.
+por la NLU y responde; seguridad por allowlist de IDs. **Scheduler (Fase 4)**:
+proceso que avisa proactivamente por Telegram — recordatorios escalonados (varios
+días antes del vencimiento) e insistentes (reitera hasta resolver), más alertas
+de presupuesto; zona horaria America/Bogota. Pendientes: entidad USER +
+autenticación web y frontend.
 
 ## Estructura
 
@@ -77,6 +80,12 @@ por HTTP. No necesita IP pública ni puertos abiertos.
 Háblale por texto o audio con naturalidad ("gasté 20 mil en mercado con
 efectivo"); el bot pasa el mensaje por la capa NLU y responde. Con
 `WHISPER_BACKEND=real` transcribe las notas de voz.
+
+El perfil `bot` levanta también el **scheduler** (Fase 4), que avisa
+proactivamente: recordatorios escalonados (3/1/0 días antes del vencimiento,
+configurable) e insistentes (reitera cada `REMINDER_REALERT_HOURS` hasta que
+resuelves), y alertas al superar el `BUDGET_ALERT_THRESHOLD` de un presupuesto.
+Todo en zona horaria `TIMEZONE` (America/Bogota).
 
 > La primera vez, el backend `real` de embeddings descarga
 > `multilingual-e5-base` (~1 GB) y lo guarda en un volumen; los siguientes

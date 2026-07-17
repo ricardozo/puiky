@@ -27,6 +27,7 @@ services:
     environment:
       # Dentro de la red de compose, la BD es el servicio "db", no localhost
       POSTGRES_HOST: db
+      TZ: America/Bogota
     ports:
       - "${APP_PORT:-8000}:8000"
     volumes:
@@ -38,7 +39,8 @@ services:
       - hf_cache:/root/.cache/huggingface
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
-  # Bot de Telegram. Solo arranca con:  docker compose --profile bot up -d bot
+  # Bot + scheduler (servicios "vivos"). Arrancan con:
+  #   docker compose --profile bot up -d
   bot:
     build: ./backend
     profiles: ["bot"]
@@ -47,11 +49,25 @@ services:
     env_file: .env
     environment:
       PUIKY_API_URL: http://app:8000
+      TZ: America/Bogota
     volumes:
       - ./backend:/app
       - /app/.venv
       - hf_cache:/root/.cache/huggingface
     command: ["python", "-m", "app.bot.main"]
+
+  scheduler:
+    build: ./backend
+    profiles: ["bot"]
+    depends_on:
+      - app
+    env_file: .env
+    environment:
+      TZ: America/Bogota
+    volumes:
+      - ./backend:/app
+      - /app/.venv
+    command: ["python", "-m", "app.scheduler.main"]
 
 volumes:
   pg_data:
