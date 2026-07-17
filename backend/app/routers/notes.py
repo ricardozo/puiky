@@ -96,7 +96,10 @@ def vincular_nota(
     note_id: uuid.UUID, data: NoteLinkCreate, db: Session = Depends(get_db)
 ) -> NoteLinkOut:
     """Vincula la nota a otra entidad (project / task / responsibility / account)."""
-    link = service.add_link(db, note_id, data)
+    try:
+        link = service.add_link(db, note_id, data)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     if link is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Nota no encontrada")
     return link

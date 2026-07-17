@@ -6,9 +6,10 @@ Asistente personal de un solo usuario: notas con búsqueda semántica, tareas,
 proyectos, responsabilidades recurrentes, finanzas y recordatorios.
 Documentación de diseño en [docs/](docs/).
 
-**Estado:** Fase 1 en curso. Dominio de **notas** completo (CRUD, vínculos y
-búsqueda semántica con pgvector). Los demás dominios y el frontend llegan en
-fases siguientes.
+**Estado:** Fase 1 en curso. Dominios listos: **notas** (CRUD, vínculos y
+búsqueda semántica con pgvector), **proyectos** y **tareas** (CRUD, Kanban por
+estado, avance/completar, tareas de hoy y pendientes). Faltan finanzas,
+responsabilidades, recordatorios y el frontend.
 
 ## Estructura
 
@@ -89,6 +90,34 @@ esa es la diferencia frente a una búsqueda por texto exacto.
 | DELETE | `/notes/{id}`         | Eliminar (borra sus vínculos en cascada) |
 | POST   | `/notes/{id}/links`   | Vincular a project / task / responsibility / account |
 | POST   | `/notes/search`       | Búsqueda semántica |
+
+### Endpoints de proyectos
+
+| Método | Ruta | Qué hace |
+|--------|------|----------|
+| POST   | `/projects`               | Crear proyecto |
+| GET    | `/projects`               | Listar (filtro opcional `?estado=`) |
+| GET    | `/projects/{id}`          | Ver proyecto con sus tareas y notas |
+| PUT    | `/projects/{id}`          | Editar |
+| POST   | `/projects/{id}/archive`  | Archivar (estado → terminado) |
+
+### Endpoints de tareas
+
+| Método | Ruta | Qué hace |
+|--------|------|----------|
+| POST   | `/tasks`                  | Crear tarea |
+| GET    | `/tasks`                  | Listar (filtros `?project_id=` `?estado=`) |
+| GET    | `/tasks/hoy`              | Vencen hoy o están vencidas y sin terminar |
+| GET    | `/tasks/pendientes`       | Todas las no terminadas |
+| GET    | `/tasks/{id}`             | Ver tarea |
+| PUT    | `/tasks/{id}`             | Editar |
+| PATCH  | `/tasks/{id}/progress`    | Marcar avance (%) |
+| POST   | `/tasks/{id}/complete`    | Marcar completada (estado → terminada, 100%) |
+| DELETE | `/tasks/{id}`             | Eliminar |
+
+**Estados (slugs):** proyecto = `activo` / `pausado` / `terminado`; tarea =
+`planeada` / `en_ejecucion` / `en_pausa` / `terminada` (las cuatro columnas del
+Kanban). El frontend muestra el texto con acentos; la API usa los slugs.
 
 ## Tests
 

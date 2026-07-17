@@ -3,5 +3,7 @@
 
 from app.models.base import Base
 from app.models.notes import Note, NoteLink
+from app.models.projects import Project
+from app.models.tasks import Task
 
-__all__ = ["Base", "Note", "NoteLink"]
+__all__ = ["Base", "Note", "NoteLink", "Project", "Task"]

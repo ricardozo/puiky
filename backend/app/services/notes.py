@@ -11,7 +11,13 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.embeddings import get_embedder
 from app.models.notes import Note, NoteLink
+from app.models.projects import Project
+from app.models.tasks import Task
 from app.schemas.notes import NoteCreate, NoteLinkCreate, NoteUpdate
+
+# Tipos de entidad cuyo destino ya se puede validar (su tabla existe).
+# responsibility / account se añadirán al crear sus dominios.
+_MODELOS_VALIDABLES = {"project": Project, "task": Task}
 
 
 def create_note(db: Session, data: NoteCreate) -> Note:
@@ -67,21 +73,43 @@ def add_link(
 ) -> NoteLink | None:
     """Vincula la nota a otra entidad (polimórfico).
 
-    DEUDA TÉCNICA: `entidad_id` no se valida contra la tabla destino porque
-    esas tablas (project/task/...) aún no existen. Validar cuando se creen.
+    Valida que el destino exista para project/task (ya tienen tabla). Para
+    responsibility/account aún no se valida (no existen sus tablas): queda
+    como deuda técnica a cerrar al crear esos dominios. Señala destino
+    inexistente con ValueError (el router lo traduce a 400).
     """
     note = db.get(Note, note_id)
     if note is None:
         return None
+    tipo = data.entidad_tipo.value
+    modelo = _MODELOS_VALIDABLES.get(tipo)
+    if modelo is not None and db.get(modelo, data.entidad_id) is None:
+        raise ValueError(f"La entidad {tipo} indicada no existe")
     link = NoteLink(
         note_id=note_id,
-        entidad_tipo=data.entidad_tipo.value,
+        entidad_tipo=tipo,
         entidad_id=data.entidad_id,
     )
     db.add(link)
     db.commit()
     db.refresh(link)
     return link
+
+
+def notes_for_entity(
+    db: Session, entidad_tipo: str, entidad_id: uuid.UUID
+) -> list[Note]:
+    """Notas vinculadas a una entidad (p. ej. las notas de un proyecto)."""
+    stmt = (
+        select(Note)
+        .join(NoteLink, NoteLink.note_id == Note.id)
+        .where(
+            NoteLink.entidad_tipo == entidad_tipo,
+            NoteLink.entidad_id == entidad_id,
+        )
+        .order_by(Note.creada.desc())
+    )
+    return list(db.execute(stmt).scalars().unique().all())
 
 
 def search_notes(
