@@ -2,6 +2,8 @@
 
 from fastapi import FastAPI
 
+from app.routers import notes
+
 app = FastAPI(
     title="Puiky API",
     description="Asistente personal — backend (Fase 1)",
@@ -15,4 +17,5 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-# Los routers de cada dominio (notas, tareas, …) se montan en pasos siguientes.
+app.include_router(notes.router)
+# Los routers de los demás dominios (tareas, proyectos, …) se montan en fases siguientes.
