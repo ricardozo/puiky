@@ -6,10 +6,13 @@ Asistente personal de un solo usuario: notas con búsqueda semántica, tareas,
 proyectos, responsabilidades recurrentes, finanzas y recordatorios.
 Documentación de diseño en [docs/](docs/).
 
-**Estado:** Fase 1 en curso. Dominios listos: **notas** (CRUD, vínculos y
-búsqueda semántica con pgvector), **proyectos** y **tareas** (CRUD, Kanban por
-estado, avance/completar, tareas de hoy y pendientes). Faltan finanzas,
-responsabilidades, recordatorios y el frontend.
+**Estado:** Fase 1 (backend / API) **completa**. Dominios listos: **notas**
+(CRUD, vínculos, búsqueda semántica con pgvector), **proyectos** y **tareas**
+(Kanban por estado, avance/completar, hoy/pendientes), **responsabilidades**
+(recurrencia que se recalcula al cumplirse), **finanzas** (cuentas con saldo,
+categorías, movimientos con transferencias, reportes de gasto, presupuestos con
+avance) y **recordatorios** (posponer, resolver, vencidos). Pendientes: entidad
+USER + autenticación, capa NLU (Qwen), canal Telegram, scheduler y frontend.
 
 ## Estructura
 
@@ -118,6 +121,50 @@ esa es la diferencia frente a una búsqueda por texto exacto.
 **Estados (slugs):** proyecto = `activo` / `pausado` / `terminado`; tarea =
 `planeada` / `en_ejecucion` / `en_pausa` / `terminada` (las cuatro columnas del
 Kanban). El frontend muestra el texto con acentos; la API usa los slugs.
+
+### Endpoints de responsabilidades
+
+| Método | Ruta | Qué hace |
+|--------|------|----------|
+| POST   | `/responsibilities`             | Crear compromiso recurrente |
+| GET    | `/responsibilities`             | Listar por próximo vencimiento |
+| GET    | `/responsibilities/{id}`        | Ver |
+| PUT    | `/responsibilities/{id}`        | Editar |
+| POST   | `/responsibilities/{id}/fulfill`| Marcar cumplida (recalcula próximo venc.) |
+| DELETE | `/responsibilities/{id}`        | Eliminar |
+
+**Recurrencia:** `diaria` / `semanal` / `mensual` / `trimestral` / `anual` /
+`cada_<N>_dias`.
+
+### Endpoints de finanzas
+
+| Método | Ruta | Qué hace |
+|--------|------|----------|
+| POST/GET/PUT | `/accounts` `/accounts/{id}` | Cuentas (crear, listar, ver saldo, editar) |
+| POST/GET/PUT | `/categories` `/categories/{id}` | Categorías (extensibles; se desactivan, no se borran) |
+| POST   | `/transactions`            | Registrar gasto / ingreso / transferencia (mueve saldos) |
+| GET    | `/transactions`            | Listar (filtros `account_id`, `tipo`, `category_id`, `desde`, `hasta`) |
+| GET    | `/transactions/reporte`    | Gastos del mes por categoría (excluye transferencias) |
+| DELETE | `/transactions/{id}`       | Eliminar (revierte saldos) |
+| POST/GET/PUT/DELETE | `/budgets` | Presupuestos (categoría opcional = global) |
+| GET    | `/budgets/{id}/progreso`   | Avance: gastado vs. tope en el mes |
+
+**Movimientos:** `tipo` = `gasto` / `ingreso` / `transferencia`. Gasto e ingreso
+requieren `category_id`; la transferencia requiere `cuenta_destino_id` y no lleva
+categoría.
+
+### Endpoints de recordatorios
+
+| Método | Ruta | Qué hace |
+|--------|------|----------|
+| POST   | `/reminders`               | Crear (atado a task/responsibility/budget, o suelto) |
+| GET    | `/reminders`               | Listar (filtro `?resuelto=`) |
+| GET    | `/reminders/vencidos`      | Sin resolver y ya disparados (o pospuestos) |
+| GET/PUT| `/reminders/{id}`          | Ver / editar |
+| POST   | `/reminders/{id}/snooze`   | Posponer |
+| POST   | `/reminders/{id}/notified` | Registrar aviso enviado (para el scheduler) |
+| POST   | `/reminders/{id}/resolve`  | Marcar resuelto |
+| DELETE | `/reminders/{id}`          | Eliminar |
 
 ## Tests
 

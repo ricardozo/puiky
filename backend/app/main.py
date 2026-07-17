@@ -2,7 +2,14 @@
 
 from fastapi import FastAPI
 
-from app.routers import notes, projects, tasks
+from app.routers import (
+    finances,
+    notes,
+    projects,
+    reminders,
+    responsibilities,
+    tasks,
+)
 
 app = FastAPI(
     title="Puiky API",
@@ -20,4 +27,9 @@ def health() -> dict[str, str]:
 app.include_router(notes.router)
 app.include_router(projects.router)
 app.include_router(tasks.router)
-# Los routers de los demás dominios (finanzas, recordatorios, …) se montan en fases siguientes.
+app.include_router(responsibilities.router)
+app.include_router(finances.accounts_router)
+app.include_router(finances.categories_router)
+app.include_router(finances.transactions_router)
+app.include_router(finances.budgets_router)
+app.include_router(reminders.router)

@@ -10,14 +10,20 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.embeddings import get_embedder
+from app.models.finances import Account
 from app.models.notes import Note, NoteLink
 from app.models.projects import Project
+from app.models.responsibilities import Responsibility
 from app.models.tasks import Task
 from app.schemas.notes import NoteCreate, NoteLinkCreate, NoteUpdate
 
-# Tipos de entidad cuyo destino ya se puede validar (su tabla existe).
-# responsibility / account se añadirán al crear sus dominios.
-_MODELOS_VALIDABLES = {"project": Project, "task": Task}
+# Tipos de entidad cuyo destino se valida (todas sus tablas ya existen).
+_MODELOS_VALIDABLES = {
+    "project": Project,
+    "task": Task,
+    "responsibility": Responsibility,
+    "account": Account,
+}
 
 
 def create_note(db: Session, data: NoteCreate) -> Note:
@@ -73,10 +79,9 @@ def add_link(
 ) -> NoteLink | None:
     """Vincula la nota a otra entidad (polimórfico).
 
-    Valida que el destino exista para project/task (ya tienen tabla). Para
-    responsibility/account aún no se valida (no existen sus tablas): queda
-    como deuda técnica a cerrar al crear esos dominios. Señala destino
-    inexistente con ValueError (el router lo traduce a 400).
+    Valida que el destino exista para los cuatro tipos (project / task /
+    responsibility / account). Señala destino inexistente con ValueError,
+    que el router traduce a 400.
     """
     note = db.get(Note, note_id)
     if note is None:
