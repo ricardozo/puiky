@@ -9,7 +9,7 @@ import {
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core'
-import { api, type ProjectDetail, type Task } from '../api'
+import { api, type Note, type ProjectDetail, type Task } from '../api'
 
 const COLUMNAS = [
   { estado: 'planeada', titulo: 'Planeada' },
@@ -392,16 +392,18 @@ function TaskEditor({
         </div>
 
         <label className="text-xs text-slate-400 flex flex-col gap-1">
-          Notas
+          Notas rápidas
           <textarea
             value={notas}
             onChange={(e) => setNotas(e.target.value)}
             onBlur={() => guardar({ notas: notas.trim() || null })}
-            rows={3}
-            placeholder="Apuntes, avances, recordatorios…"
+            rows={2}
+            placeholder="Apunte suelto que no amerita una hoja…"
             className="rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-slate-100 outline-none focus:border-indigo-500"
           />
         </label>
+
+        <NotasVinculadas taskId={task.id} />
 
         <div className="pt-2 border-t border-slate-800">
           <button
@@ -412,6 +414,113 @@ function TaskEditor({
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+function NotasVinculadas({ taskId }: { taskId: string }) {
+  const [notas, setNotas] = useState<Note[]>([])
+  const [titulo, setTitulo] = useState('')
+  const [cuerpo, setCuerpo] = useState('')
+
+  const cargar = () => api.linkedNotes('task', taskId).then(setNotas)
+  useEffect(() => {
+    cargar()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskId])
+
+  const crear = async () => {
+    if (!cuerpo.trim()) return
+    const n = await api.createNote(cuerpo.trim(), null, titulo.trim() || null)
+    await api.linkNote(n.id, 'task', taskId)
+    setTitulo('')
+    setCuerpo('')
+    cargar()
+  }
+  const desvincular = async (id: string) => {
+    await api.unlinkNote(id, 'task', taskId)
+    cargar()
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="text-sm font-medium text-slate-300">
+        Notas vinculadas{' '}
+        <span className="text-slate-500 font-normal">
+          (hojas · buscables)
+        </span>
+      </div>
+      {notas.map((n) => (
+        <NotaVinculada key={n.id} nota={n} onDesvincular={() => desvincular(n.id)} />
+      ))}
+      <div className="rounded-lg border border-dashed border-slate-700 p-2 space-y-2">
+        <input
+          value={titulo}
+          onChange={(e) => setTitulo(e.target.value)}
+          placeholder="Título (opcional)"
+          className="w-full bg-transparent text-sm outline-none placeholder:text-slate-600"
+        />
+        <div className="flex gap-2">
+          <textarea
+            value={cuerpo}
+            onChange={(e) => setCuerpo(e.target.value)}
+            placeholder="Nueva nota para esta tarea…"
+            rows={2}
+            className="flex-1 rounded-lg bg-slate-950 border border-slate-700 px-3 py-1.5 text-sm outline-none focus:border-indigo-500"
+          />
+          <button
+            onClick={crear}
+            className="rounded-lg border border-slate-700 px-3 text-sm hover:bg-slate-800 shrink-0"
+          >
+            + Añadir
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function NotaVinculada({
+  nota,
+  onDesvincular,
+}: {
+  nota: Note
+  onDesvincular: () => void
+}) {
+  const [titulo, setTitulo] = useState(nota.titulo ?? '')
+  const [cuerpo, setCuerpo] = useState(nota.contenido)
+
+  const guardar = () =>
+    api.updateNote(nota.id, {
+      titulo: titulo.trim() || null,
+      contenido: cuerpo.trim(),
+    })
+
+  return (
+    <div className="group rounded-lg border border-slate-800 bg-slate-950/60 p-2.5">
+      <div className="flex items-center gap-2">
+        <input
+          value={titulo}
+          onChange={(e) => setTitulo(e.target.value)}
+          onBlur={guardar}
+          placeholder="Sin título"
+          className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-slate-600"
+        />
+        <button
+          onClick={onDesvincular}
+          title="Desvincular (no borra la hoja)"
+          className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 text-xs transition"
+        >
+          desvincular
+        </button>
+      </div>
+      <textarea
+        value={cuerpo}
+        onChange={(e) => setCuerpo(e.target.value)}
+        onBlur={guardar}
+        rows={2}
+        className="w-full mt-1 bg-transparent text-sm text-slate-300 outline-none resize-none"
+      />
     </div>
   )
 }

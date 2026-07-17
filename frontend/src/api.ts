@@ -288,6 +288,22 @@ export const api = {
   deleteChecklistItem: (itemId: string) =>
     request<Task>(`/tasks/checklist/${itemId}`, { method: 'DELETE' }),
 
+  // Hojas vinculadas a una entidad (p. ej. una tarea)
+  linkedNotes: (entidadTipo: string, entidadId: string) =>
+    request<Note[]>(
+      `/notes/vinculadas?entidad_tipo=${entidadTipo}&entidad_id=${entidadId}`
+    ),
+  linkNote: (noteId: string, entidadTipo: string, entidadId: string) =>
+    request<unknown>(`/notes/${noteId}/links`, {
+      method: 'POST',
+      body: JSON.stringify({ entidad_tipo: entidadTipo, entidad_id: entidadId }),
+    }),
+  unlinkNote: (noteId: string, entidadTipo: string, entidadId: string) =>
+    request<void>(
+      `/notes/${noteId}/links?entidad_tipo=${entidadTipo}&entidad_id=${entidadId}`,
+      { method: 'DELETE' }
+    ),
+
   // Finanzas
   listAccounts: () => request<Account[]>('/accounts'),
   createAccount: (nombre: string, tipo: string, saldoInicial: number) =>

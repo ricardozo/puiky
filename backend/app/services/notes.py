@@ -162,7 +162,7 @@ def add_link(
 def notes_for_entity(
     db: Session, entidad_tipo: str, entidad_id: uuid.UUID
 ) -> list[Note]:
-    """Notas vinculadas a una entidad (p. ej. las notas de un proyecto)."""
+    """Notas vinculadas a una entidad (p. ej. las notas de un proyecto o tarea)."""
     stmt = (
         select(Note)
         .join(NoteLink, NoteLink.note_id == Note.id)
@@ -173,6 +173,25 @@ def notes_for_entity(
         .order_by(Note.creada.desc())
     )
     return list(db.execute(stmt).scalars().unique().all())
+
+
+def delete_link_between(
+    db: Session, note_id: uuid.UUID, entidad_tipo: str, entidad_id: uuid.UUID
+) -> bool:
+    """Desvincula una nota de una entidad (elimina ese NoteLink). La nota no se
+    borra: solo deja de estar vinculada."""
+    link = db.execute(
+        select(NoteLink).where(
+            NoteLink.note_id == note_id,
+            NoteLink.entidad_tipo == entidad_tipo,
+            NoteLink.entidad_id == entidad_id,
+        )
+    ).scalar_one_or_none()
+    if link is None:
+        return False
+    db.delete(link)
+    db.commit()
+    return True
 
 
 def search_notes(

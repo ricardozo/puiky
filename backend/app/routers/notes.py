@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.schemas.notes import (
+    EntidadTipo,
     NoteAppend,
     NoteCreate,
     NoteLinkCreate,
@@ -53,6 +54,16 @@ def buscar_notas(
         )
         for nota, similitud in resultados
     ]
+
+
+@router.get("/vinculadas", response_model=list[NoteOut])
+def notas_vinculadas(
+    entidad_tipo: EntidadTipo,
+    entidad_id: uuid.UUID,
+    db: Session = Depends(get_db),
+) -> list[NoteOut]:
+    """Hojas vinculadas a una entidad (task / project / responsibility / account)."""
+    return service.notes_for_entity(db, entidad_tipo.value, entidad_id)
 
 
 @router.get("", response_model=list[NoteOut])
@@ -131,3 +142,17 @@ def vincular_nota(
     if link is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Nota no encontrada")
     return link
+
+
+@router.delete("/{note_id}/links", status_code=status.HTTP_204_NO_CONTENT)
+def desvincular_nota(
+    note_id: uuid.UUID,
+    entidad_tipo: EntidadTipo,
+    entidad_id: uuid.UUID,
+    db: Session = Depends(get_db),
+) -> None:
+    """Desvincula la nota de una entidad (no borra la nota)."""
+    if not service.delete_link_between(
+        db, note_id, entidad_tipo.value, entidad_id
+    ):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Vínculo no encontrado")
