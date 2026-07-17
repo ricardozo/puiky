@@ -18,8 +18,11 @@ con transferencias, reportes de gasto, presupuestos con avance) y **recordatorio
 por la NLU y responde; seguridad por allowlist de IDs. **Scheduler (Fase 4)**:
 proceso que avisa proactivamente por Telegram — recordatorios escalonados (varios
 días antes del vencimiento) e insistentes (reitera hasta resolver), más alertas
-de presupuesto; zona horaria America/Bogota. Pendientes: entidad USER +
-autenticación web y frontend.
+de presupuesto; zona horaria America/Bogota. **Frontend web (Fase 5, en curso)**:
+React + Tailwind con login (JWT) y pantalla de Notas (crear, listar, búsqueda
+semántica); la API queda protegida (usuario web con JWT, bot con token de
+servicio). Pendientes: resto de pantallas (Kanban de proyectos/tareas, finanzas,
+etc.).
 
 ## Estructura
 
@@ -32,7 +35,7 @@ backend/    API FastAPI + SQLAlchemy + Alembic (Postgres + pgvector)
     routers/    endpoints HTTP
     embeddings.py  servicio de embeddings (real / fake)
   alembic/    migraciones
-frontend/   (Fase 5) interfaz React — aún no creada
+frontend/   interfaz web React (Vite + TypeScript + Tailwind)
 docs/        especificación funcional y modelo de datos
 ```
 
@@ -215,6 +218,25 @@ tool-calling sin Telegram (el bot de la Fase 3 usará estos mismos).
 Para usar el Qwen real, en `.env`: `LLM_BACKEND=real` y `LLM_BASE_URL` apuntando
 a Ollama (en el servidor, o vía túnel `ssh -L 11434:localhost:11434 usuario@servidor`).
 Igual para el audio: `WHISPER_BACKEND=real`.
+
+## Frontend (interfaz web)
+
+Requiere Node. En dev corre con el servidor de Vite (HMR) y consume la API.
+
+```bash
+cd frontend
+pnpm install
+pnpm dev            # http://localhost:5173
+```
+
+Necesita autenticación. Crea el usuario (una vez):
+
+```bash
+docker compose exec app python -m app.create_user <usuario> <password>
+```
+
+Entra en http://localhost:5173 y haz login. La API debe estar arriba
+(`docker compose up`) y `CORS_ORIGINS` incluir el origen del dev server.
 
 ## Tests
 
