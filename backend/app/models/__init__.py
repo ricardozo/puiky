@@ -9,7 +9,7 @@ from app.models.portfolios import Portfolio
 from app.models.projects import Project
 from app.models.reminders import Reminder
 from app.models.responsibilities import Responsibility
-from app.models.tasks import Task
+from app.models.tasks import ChecklistItem, Task
 from app.models.users import User
 
 __all__ = [
@@ -17,6 +17,7 @@ __all__ = [
     "Account",
     "Budget",
     "Category",
+    "ChecklistItem",
     "Note",
     "NoteLink",
     "Notebook",

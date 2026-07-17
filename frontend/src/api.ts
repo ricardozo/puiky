@@ -77,6 +77,12 @@ export interface Portfolio {
   creada: string
   proyectos: number
 }
+export interface ChecklistItem {
+  id: string
+  texto: string
+  hecho: boolean
+  orden: number
+}
 export interface Task {
   id: string
   project_id: string | null
@@ -84,6 +90,17 @@ export interface Task {
   estado: string
   avance_pct: number
   fecha_limite: string | null
+  fecha_inicio_plan: string | null
+  fecha_inicio_real: string | null
+  fecha_fin_real: string | null
+  checklist: ChecklistItem[]
+}
+export interface TaskFechas {
+  titulo?: string
+  fecha_limite?: string | null
+  fecha_inicio_plan?: string | null
+  fecha_inicio_real?: string | null
+  fecha_fin_real?: string | null
 }
 export interface ProjectDetail extends Project {
   tasks: Task[]
@@ -248,8 +265,22 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ estado }),
     }),
+  updateTask: (id: string, data: TaskFechas) =>
+    request<Task>(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteTask: (id: string) =>
     request<void>(`/tasks/${id}`, { method: 'DELETE' }),
+  addChecklistItem: (taskId: string, texto: string) =>
+    request<Task>(`/tasks/${taskId}/checklist`, {
+      method: 'POST',
+      body: JSON.stringify({ texto }),
+    }),
+  toggleChecklistItem: (itemId: string, hecho: boolean) =>
+    request<Task>(`/tasks/checklist/${itemId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ hecho }),
+    }),
+  deleteChecklistItem: (itemId: string) =>
+    request<Task>(`/tasks/checklist/${itemId}`, { method: 'DELETE' }),
 
   // Finanzas
   listAccounts: () => request<Account[]>('/accounts'),

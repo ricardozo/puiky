@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.schemas.tasks import (
+    ChecklistItemCreate,
+    ChecklistItemUpdate,
     TaskCreate,
     TaskEstado,
     TaskOut,
@@ -16,6 +18,30 @@ from app.schemas.tasks import (
 from app.services import tasks as service
 
 router = APIRouter(prefix="/tasks", tags=["tareas"])
+
+
+# --- Checklist (rutas literales, antes de /{task_id}) ---
+
+
+@router.patch("/checklist/{item_id}", response_model=TaskOut)
+def editar_item_checklist(
+    item_id: uuid.UUID, data: ChecklistItemUpdate, db: Session = Depends(get_db)
+) -> TaskOut:
+    """Marca/desmarca o edita un ítem; recalcula el avance de la tarea."""
+    tarea = service.update_checklist_item(db, item_id, data)
+    if tarea is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Ítem no encontrado")
+    return tarea
+
+
+@router.delete("/checklist/{item_id}", response_model=TaskOut)
+def eliminar_item_checklist(
+    item_id: uuid.UUID, db: Session = Depends(get_db)
+) -> TaskOut:
+    tarea = service.delete_checklist_item(db, item_id)
+    if tarea is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Ítem no encontrado")
+    return tarea
 
 
 @router.post("", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
@@ -88,6 +114,17 @@ def completar_tarea(
 ) -> TaskOut:
     """Marca la tarea como terminada (avance 100%)."""
     tarea = service.complete_task(db, task_id)
+    if tarea is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Tarea no encontrada")
+    return tarea
+
+
+@router.post("/{task_id}/checklist", response_model=TaskOut)
+def agregar_item_checklist(
+    task_id: uuid.UUID, data: ChecklistItemCreate, db: Session = Depends(get_db)
+) -> TaskOut:
+    """Añade un ítem al checklist de la tarea."""
+    tarea = service.add_checklist_item(db, task_id, data)
     if tarea is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Tarea no encontrada")
     return tarea

@@ -1,9 +1,18 @@
-"""Modelo del dominio de tareas."""
+"""Modelo del dominio de tareas y sus ítems de checklist."""
 
 import uuid
 from datetime import date
 
-from sqlalchemy import UUID, Date, ForeignKey, Index, Integer, String, text
+from sqlalchemy import (
+    UUID,
+    Boolean,
+    Date,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -32,11 +41,44 @@ class Task(Base):
     estado: Mapped[str] = mapped_column(
         String(20), nullable=False, server_default=text("'planeada'")
     )
+    # Avance %. Manual si no hay checklist; calculado del checklist si lo hay.
     avance_pct: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=text("0")
     )
+    # Fechas. `fecha_limite` es el FIN PLANEADO (deadline; lo usa el scheduler).
     fecha_limite: Mapped[date | None] = mapped_column(Date, nullable=True)
+    fecha_inicio_plan: Mapped[date | None] = mapped_column(Date, nullable=True)
+    fecha_inicio_real: Mapped[date | None] = mapped_column(Date, nullable=True)
+    fecha_fin_real: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     project: Mapped["Project | None"] = relationship(  # noqa: F821
         back_populates="tasks"
     )
+    checklist: Mapped[list["ChecklistItem"]] = relationship(
+        back_populates="task",
+        cascade="all, delete-orphan",
+        order_by="ChecklistItem.orden",
+    )
+
+
+class ChecklistItem(Base):
+    """Ítem marcable de una tarea. Su proporción marcada da el % de avance."""
+
+    __tablename__ = "checklist_item"
+    __table_args__ = (Index("ix_checklist_item_task_id", "task_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("task.id", ondelete="CASCADE"), nullable=False
+    )
+    texto: Mapped[str] = mapped_column(String(300), nullable=False)
+    hecho: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    orden: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+
+    task: Mapped["Task"] = relationship(back_populates="checklist")

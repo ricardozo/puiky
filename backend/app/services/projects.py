@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models.portfolios import Portfolio
 from app.models.projects import Project
+from app.models.tasks import Task
 from app.schemas.projects import ProjectCreate, ProjectUpdate
 
 TERMINADO = "terminado"
@@ -38,7 +39,7 @@ def get_project(db: Session, project_id: uuid.UUID) -> Project | None:
     """Proyecto con sus tareas cargadas (las notas las agrega el router)."""
     stmt = (
         select(Project)
-        .options(selectinload(Project.tasks))
+        .options(selectinload(Project.tasks).selectinload(Task.checklist))
         .where(Project.id == project_id)
     )
     return db.execute(stmt).scalar_one_or_none()

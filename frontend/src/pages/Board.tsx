@@ -11,7 +11,6 @@ import {
 } from '@dnd-kit/core'
 import { api, type ProjectDetail, type Task } from '../api'
 
-// Orden convencional de Kanban. (El spec deja el orden configurable a futuro.)
 const COLUMNAS = [
   { estado: 'planeada', titulo: 'Planeada' },
   { estado: 'en_ejecucion', titulo: 'En ejecución' },
@@ -19,7 +18,11 @@ const COLUMNAS = [
   { estado: 'terminada', titulo: 'Terminada' },
 ]
 
-function Card({ task }: { task: Task }) {
+function hechos(t: Task): number {
+  return t.checklist.filter((i) => i.hecho).length
+}
+
+function Card({ task, onAbrir }: { task: Task; onAbrir: (t: Task) => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({ id: task.id })
   const style = transform
@@ -31,13 +34,19 @@ function Card({ task }: { task: Task }) {
       style={style}
       {...listeners}
       {...attributes}
-      className={`rounded-lg border border-slate-700 bg-slate-800 p-3 cursor-grab active:cursor-grabbing ${
+      onClick={() => onAbrir(task)}
+      className={`rounded-lg border border-slate-700 bg-slate-800 p-3 cursor-pointer active:cursor-grabbing ${
         isDragging ? 'opacity-50' : ''
       }`}
     >
       <div className="text-sm">{task.titulo}</div>
+      {task.checklist.length > 0 && (
+        <div className="text-xs text-slate-400 mt-1.5">
+          ☑ {hechos(task)}/{task.checklist.length}
+        </div>
+      )}
       {task.avance_pct > 0 && (
-        <div className="mt-2 h-1 rounded bg-slate-700 overflow-hidden">
+        <div className="mt-1.5 h-1 rounded bg-slate-700 overflow-hidden">
           <div
             className="h-full bg-indigo-500"
             style={{ width: `${task.avance_pct}%` }}
@@ -57,10 +66,12 @@ function Column({
   estado,
   titulo,
   tasks,
+  onAbrir,
 }: {
   estado: string
   titulo: string
   tasks: Task[]
+  onAbrir: (t: Task) => void
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: estado })
   return (
@@ -78,7 +89,7 @@ function Column({
       </div>
       <div className="space-y-2 min-h-16">
         {tasks.map((t) => (
-          <Card key={t.id} task={t} />
+          <Card key={t.id} task={t} onAbrir={onAbrir} />
         ))}
       </div>
     </div>
@@ -90,6 +101,7 @@ export default function Board() {
   const [project, setProject] = useState<ProjectDetail | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
   const [nuevo, setNuevo] = useState('')
+  const [abierta, setAbierta] = useState<Task | null>(null)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   )
@@ -111,11 +123,10 @@ export default function Board() {
     if (!nuevoEstado) return
     const task = tasks.find((t) => t.id === taskId)
     if (!task || task.estado === nuevoEstado) return
-    // Optimista: mueve la tarjeta ya; revierte si la API falla.
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, estado: nuevoEstado } : t))
     )
-    api.updateTaskEstado(taskId, nuevoEstado).catch(() => cargar())
+    api.updateTaskEstado(taskId, nuevoEstado).then(cargar).catch(cargar)
   }
 
   const crearTarea = async (e: FormEvent) => {
@@ -131,10 +142,7 @@ export default function Board() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Link
-          to="/proyectos"
-          className="text-slate-400 hover:text-slate-200 text-sm"
-        >
+        <Link to="/proyectos" className="text-slate-400 hover:text-slate-200 text-sm">
           ← Proyectos
         </Link>
         <h2 className="text-xl font-semibold">{project.nombre}</h2>
@@ -160,6 +168,7 @@ export default function Board() {
               estado={c.estado}
               titulo={c.titulo}
               tasks={tasks.filter((t) => t.estado === c.estado)}
+              onAbrir={setAbierta}
             />
           ))}
         </div>
@@ -172,11 +181,184 @@ export default function Board() {
           </h3>
           <ul className="space-y-1 text-sm text-slate-300">
             {project.notes.map((n) => (
-              <li key={n.id}>• {n.contenido}</li>
+              <li key={n.id}>• {n.titulo || n.contenido}</li>
             ))}
           </ul>
         </div>
       )}
+
+      {abierta && (
+        <TaskEditor
+          taskInicial={abierta}
+          onClose={() => {
+            setAbierta(null)
+            cargar()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function Fecha({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: string | null
+  onChange: (v: string | null) => void
+}) {
+  return (
+    <label className="text-xs text-slate-400 flex flex-col gap-1">
+      {label}
+      <input
+        type="date"
+        min="2000-01-01"
+        max="9999-12-31"
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value || null)}
+        className="rounded-lg bg-slate-950 border border-slate-700 px-2 py-1.5 text-slate-100 outline-none focus:border-indigo-500"
+      />
+    </label>
+  )
+}
+
+function TaskEditor({
+  taskInicial,
+  onClose,
+}: {
+  taskInicial: Task
+  onClose: () => void
+}) {
+  const [task, setTask] = useState<Task>(taskInicial)
+  const [titulo, setTitulo] = useState(taskInicial.titulo)
+  const [nuevoItem, setNuevoItem] = useState('')
+
+  const guardar = async (patch: Record<string, unknown>) => {
+    setTask(await api.updateTask(task.id, patch))
+  }
+  const addItem = async () => {
+    if (!nuevoItem.trim()) return
+    setTask(await api.addChecklistItem(task.id, nuevoItem.trim()))
+    setNuevoItem('')
+  }
+  const toggle = async (itemId: string, hecho: boolean) =>
+    setTask(await api.toggleChecklistItem(itemId, hecho))
+  const delItem = async (itemId: string) =>
+    setTask(await api.deleteChecklistItem(itemId))
+  const delTask = async () => {
+    await api.deleteTask(task.id)
+    onClose()
+  }
+
+  const done = task.checklist.filter((i) => i.hecho).length
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-6 space-y-5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <input
+            value={titulo}
+            onChange={(e) => setTitulo(e.target.value)}
+            onBlur={() => titulo.trim() && guardar({ titulo: titulo.trim() })}
+            className="flex-1 bg-transparent text-lg font-semibold outline-none"
+          />
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-200">
+            ✕
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3 text-sm">
+          <span className="rounded px-2 py-0.5 bg-slate-800 text-slate-300">
+            {task.estado}
+          </span>
+          <span className="text-slate-400">{task.avance_pct}% avance</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Fecha
+            label="Inicio planeado"
+            value={task.fecha_inicio_plan}
+            onChange={(v) => guardar({ fecha_inicio_plan: v })}
+          />
+          <Fecha
+            label="Fin planeado"
+            value={task.fecha_limite}
+            onChange={(v) => guardar({ fecha_limite: v })}
+          />
+          <Fecha
+            label="Inicio real"
+            value={task.fecha_inicio_real}
+            onChange={(v) => guardar({ fecha_inicio_real: v })}
+          />
+          <Fecha
+            label="Fin real"
+            value={task.fecha_fin_real}
+            onChange={(v) => guardar({ fecha_fin_real: v })}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-slate-300">
+            Checklist{' '}
+            {task.checklist.length > 0 && (
+              <span className="text-slate-500 font-normal">
+                ({done}/{task.checklist.length})
+              </span>
+            )}
+          </div>
+          {task.checklist.map((i) => (
+            <div key={i.id} className="group flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={i.hecho}
+                onChange={() => toggle(i.id, !i.hecho)}
+                className="size-4 accent-indigo-500"
+              />
+              <span className={i.hecho ? 'line-through text-slate-500' : ''}>
+                {i.texto}
+              </span>
+              <button
+                onClick={() => delItem(i.id)}
+                className="ml-auto opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 text-sm"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          <div className="flex gap-2">
+            <input
+              value={nuevoItem}
+              onChange={(e) => setNuevoItem(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addItem()}
+              placeholder="Nuevo ítem…"
+              className="flex-1 rounded-lg bg-slate-950 border border-slate-700 px-3 py-1.5 text-sm outline-none focus:border-indigo-500"
+            />
+            <button
+              onClick={addItem}
+              className="rounded-lg border border-slate-700 px-3 text-sm hover:bg-slate-800"
+            >
+              + Añadir
+            </button>
+          </div>
+        </div>
+
+        <div className="pt-2 border-t border-slate-800">
+          <button
+            onClick={delTask}
+            className="text-slate-500 hover:text-red-400 text-sm"
+          >
+            Eliminar tarea
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

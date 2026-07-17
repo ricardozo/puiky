@@ -21,13 +21,15 @@ class TaskCreate(BaseModel):
     project_id: uuid.UUID | None = None
     estado: TaskEstado = TaskEstado.planeada
     avance_pct: int = Field(default=0, ge=0, le=100)
-    fecha_limite: date | None = None
+    fecha_limite: date | None = None  # fin planeado (deadline)
+    fecha_inicio_plan: date | None = None
+    fecha_inicio_real: date | None = None
+    fecha_fin_real: date | None = None
 
 
 class TaskUpdate(BaseModel):
     """Actualización parcial: solo los campos enviados cambian.
-
-    `project_id` y `fecha_limite` admiten null explícito para desasignar.
+    Los campos de fecha y `project_id` admiten null explícito para desasignar.
     """
 
     titulo: str | None = Field(default=None, min_length=1, max_length=300)
@@ -35,10 +37,34 @@ class TaskUpdate(BaseModel):
     estado: TaskEstado | None = None
     avance_pct: int | None = Field(default=None, ge=0, le=100)
     fecha_limite: date | None = None
+    fecha_inicio_plan: date | None = None
+    fecha_inicio_real: date | None = None
+    fecha_fin_real: date | None = None
 
 
 class TaskProgress(BaseModel):
     avance_pct: int = Field(ge=0, le=100)
+
+
+# --- Checklist ---
+
+
+class ChecklistItemCreate(BaseModel):
+    texto: str = Field(min_length=1, max_length=300)
+
+
+class ChecklistItemUpdate(BaseModel):
+    texto: str | None = Field(default=None, min_length=1, max_length=300)
+    hecho: bool | None = None
+
+
+class ChecklistItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    texto: str
+    hecho: bool
+    orden: int
 
 
 class TaskOut(BaseModel):
@@ -50,3 +76,7 @@ class TaskOut(BaseModel):
     estado: str
     avance_pct: int
     fecha_limite: date | None
+    fecha_inicio_plan: date | None
+    fecha_inicio_real: date | None
+    fecha_fin_real: date | None
+    checklist: list[ChecklistItemOut] = []
