@@ -1,9 +1,14 @@
+import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './auth'
+import Layout from './components/Layout'
 import Login from './pages/Login'
 import Notes from './pages/Notes'
+import Projects from './pages/Projects'
+import Board from './pages/Board'
+import Placeholder from './pages/Placeholder'
 
 export default function App() {
-  const { usuario, loading, logout } = useAuth()
+  const { usuario, loading } = useAuth()
 
   if (loading)
     return (
@@ -15,25 +20,24 @@ export default function App() {
   if (!usuario) return <Login />
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
-        <div className="flex items-baseline gap-2">
-          <span className="text-xl font-semibold">Puiky</span>
-          <span className="text-slate-500 text-sm">tu segundo cerebro</span>
-        </div>
-        <div className="flex items-center gap-3 text-sm text-slate-400">
-          <span>{usuario}</span>
-          <button
-            onClick={logout}
-            className="rounded-md border border-slate-700 px-3 py-1 hover:bg-slate-800 transition"
-          >
-            Salir
-          </button>
-        </div>
-      </header>
-      <main className="mx-auto max-w-3xl px-6 py-8">
-        <Notes />
-      </main>
-    </div>
+    <Routes>
+      <Route element={<Layout />}>
+        <Route index element={<Navigate to="/notas" replace />} />
+        <Route path="notas" element={<Notes />} />
+        <Route path="proyectos" element={<Projects />} />
+        <Route path="proyectos/:id" element={<Board />} />
+        <Route path="tareas" element={<Placeholder titulo="Tareas" />} />
+        <Route path="finanzas" element={<Placeholder titulo="Finanzas" />} />
+        <Route
+          path="responsabilidades"
+          element={<Placeholder titulo="Responsabilidades" />}
+        />
+        <Route
+          path="recordatorios"
+          element={<Placeholder titulo="Recordatorios" />}
+        />
+        <Route path="*" element={<Navigate to="/notas" replace />} />
+      </Route>
+    </Routes>
   )
 }

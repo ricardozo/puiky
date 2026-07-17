@@ -45,6 +45,25 @@ export interface SearchResult extends Note {
   similitud: number
 }
 
+export interface Project {
+  id: string
+  nombre: string
+  descripcion: string | null
+  estado: string
+}
+export interface Task {
+  id: string
+  project_id: string | null
+  titulo: string
+  estado: string
+  avance_pct: number
+  fecha_limite: string | null
+}
+export interface ProjectDetail extends Project {
+  tasks: Task[]
+  notes: Note[]
+}
+
 export const api = {
   login: (usuario: string, password: string) =>
     request<{ access_token: string }>('/auth/login', {
@@ -65,4 +84,27 @@ export const api = {
     }),
   deleteNote: (id: string) =>
     request<void>(`/notes/${id}`, { method: 'DELETE' }),
+
+  // Proyectos
+  listProjects: () => request<Project[]>('/projects'),
+  getProject: (id: string) => request<ProjectDetail>(`/projects/${id}`),
+  createProject: (nombre: string, descripcion?: string) =>
+    request<Project>('/projects', {
+      method: 'POST',
+      body: JSON.stringify({ nombre, descripcion: descripcion || null }),
+    }),
+
+  // Tareas
+  createTask: (titulo: string, projectId: string) =>
+    request<Task>('/tasks', {
+      method: 'POST',
+      body: JSON.stringify({ titulo, project_id: projectId }),
+    }),
+  updateTaskEstado: (id: string, estado: string) =>
+    request<Task>(`/tasks/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ estado }),
+    }),
+  deleteTask: (id: string) =>
+    request<void>(`/tasks/${id}`, { method: 'DELETE' }),
 }
