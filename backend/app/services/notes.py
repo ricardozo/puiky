@@ -32,16 +32,38 @@ def _validar_cuaderno(db: Session, notebook_id: uuid.UUID | None) -> None:
         raise ValueError("El cuaderno indicado no existe")
 
 
+def _texto_embedding(titulo: str | None, contenido: str) -> str:
+    """Se indexa título + cuerpo para encontrar la hoja por cualquiera."""
+    return f"{titulo}\n{contenido}" if titulo else contenido
+
+
 def create_note(db: Session, data: NoteCreate) -> Note:
-    """Crea una nota generando y guardando su embedding."""
+    """Crea una hoja generando y guardando su embedding (título + cuerpo)."""
     _validar_cuaderno(db, data.notebook_id)
-    embedding = get_embedder().embed_document(data.contenido)
+    embedding = get_embedder().embed_document(
+        _texto_embedding(data.titulo, data.contenido)
+    )
     note = Note(
+        titulo=data.titulo,
         contenido=data.contenido,
         embedding=embedding,
         notebook_id=data.notebook_id,
     )
     db.add(note)
+    db.commit()
+    db.refresh(note)
+    return note
+
+
+def append_note(db: Session, note_id: uuid.UUID, texto: str) -> Note | None:
+    """Añade texto al cuerpo de una hoja (en una línea nueva) y re-indexa."""
+    note = db.get(Note, note_id)
+    if note is None:
+        return None
+    note.contenido = f"{note.contenido}\n{texto}"
+    note.embedding = get_embedder().embed_document(
+        _texto_embedding(note.titulo, note.contenido)
+    )
     db.commit()
     db.refresh(note)
     return note
@@ -84,9 +106,17 @@ def update_note(db: Session, note_id: uuid.UUID, data: NoteUpdate) -> Note | Non
     if "notebook_id" in cambios:
         _validar_cuaderno(db, cambios["notebook_id"])
         note.notebook_id = cambios["notebook_id"]
+    reembeber = False
+    if "titulo" in cambios:
+        note.titulo = cambios["titulo"]
+        reembeber = True
     if cambios.get("contenido"):
         note.contenido = cambios["contenido"]
-        note.embedding = get_embedder().embed_document(cambios["contenido"])
+        reembeber = True
+    if reembeber:
+        note.embedding = get_embedder().embed_document(
+            _texto_embedding(note.titulo, note.contenido)
+        )
     db.commit()
     db.refresh(note)
     return note

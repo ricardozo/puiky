@@ -25,6 +25,8 @@ class Note(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
     )
+    # Título de la hoja (opcional). El cuerpo va en `contenido` y puede crecer.
+    titulo: Mapped[str | None] = mapped_column(String(200), nullable=True)
     contenido: Mapped[str] = mapped_column(Text, nullable=False)
     embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIM), nullable=False)
     # Cuaderno al que pertenece la nota (opcional: null = sin cuaderno).
@@ -35,6 +37,12 @@ class Note(Base):
     )
     creada: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    actualizada: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
     )
 
     links: Mapped[list["NoteLink"]] = relationship(

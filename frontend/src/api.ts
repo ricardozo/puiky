@@ -46,9 +46,11 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
 
 export interface Note {
   id: string
+  titulo: string | null
   contenido: string
   notebook_id: string | null
   creada: string
+  actualizada: string
 }
 export interface SearchResult extends Note {
   similitud: number
@@ -153,10 +155,27 @@ export const api = {
     else if (opts?.notebookId) q = `?notebook_id=${opts.notebookId}`
     return request<Note[]>(`/notes${q}`)
   },
-  createNote: (contenido: string, notebookId?: string | null) =>
+  createNote: (
+    contenido: string,
+    notebookId?: string | null,
+    titulo?: string | null
+  ) =>
     request<Note>('/notes', {
       method: 'POST',
-      body: JSON.stringify({ contenido, notebook_id: notebookId ?? null }),
+      body: JSON.stringify({
+        contenido,
+        notebook_id: notebookId ?? null,
+        titulo: titulo ?? null,
+      }),
+    }),
+  updateNote: (
+    id: string,
+    data: { titulo?: string | null; contenido?: string; notebook_id?: string | null }
+  ) => request<Note>(`/notes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  appendNote: (id: string, texto: string) =>
+    request<Note>(`/notes/${id}/append`, {
+      method: 'POST',
+      body: JSON.stringify({ texto }),
     }),
   moveNote: (id: string, notebookId: string | null) =>
     request<Note>(`/notes/${id}`, {

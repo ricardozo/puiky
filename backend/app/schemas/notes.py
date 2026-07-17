@@ -25,24 +25,32 @@ class EntidadTipo(str, Enum):
 
 class NoteCreate(BaseModel):
     contenido: str = Field(min_length=1)
+    titulo: str | None = Field(default=None, max_length=200)
     notebook_id: uuid.UUID | None = None
 
 
 class NoteUpdate(BaseModel):
-    """Actualización parcial: solo los campos enviados cambian. `notebook_id`
-    admite null explícito para sacar la nota de su cuaderno."""
+    """Actualización parcial: solo los campos enviados cambian. `notebook_id` y
+    `titulo` admiten null explícito (quitar cuaderno / quitar título)."""
 
     contenido: str | None = Field(default=None, min_length=1)
+    titulo: str | None = Field(default=None, max_length=200)
     notebook_id: uuid.UUID | None = None
+
+
+class NoteAppend(BaseModel):
+    texto: str = Field(min_length=1)
 
 
 class NoteOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    titulo: str | None
     contenido: str
     notebook_id: uuid.UUID | None
     creada: datetime
+    actualizada: datetime
 
 
 # --- Vínculos ---

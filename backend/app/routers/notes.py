@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.schemas.notes import (
+    NoteAppend,
     NoteCreate,
     NoteLinkCreate,
     NoteLinkOut,
@@ -43,9 +44,11 @@ def buscar_notas(
     return [
         SearchResult(
             id=nota.id,
+            titulo=nota.titulo,
             contenido=nota.contenido,
             notebook_id=nota.notebook_id,
             creada=nota.creada,
+            actualizada=nota.actualizada,
             similitud=similitud,
         )
         for nota, similitud in resultados
@@ -89,6 +92,17 @@ def editar_nota(
         nota = service.update_note(db, note_id, data)
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    if nota is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Nota no encontrada")
+    return nota
+
+
+@router.post("/{note_id}/append", response_model=NoteOut)
+def anexar_nota(
+    note_id: uuid.UUID, data: NoteAppend, db: Session = Depends(get_db)
+) -> NoteOut:
+    """Añade texto al cuerpo de una hoja (una línea nueva)."""
+    nota = service.append_note(db, note_id, data.texto)
     if nota is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Nota no encontrada")
     return nota
