@@ -64,6 +64,48 @@ export interface ProjectDetail extends Project {
   notes: Note[]
 }
 
+// Los montos llegan como string (Decimal) desde la API.
+export interface Account {
+  id: string
+  nombre: string
+  tipo: string
+  saldo: string
+}
+export interface Category {
+  id: string
+  nombre: string
+  activa: boolean
+}
+export interface Transaction {
+  id: string
+  tipo: string
+  monto: string
+  account_id: string
+  cuenta_destino_id: string | null
+  category_id: string | null
+  fecha: string
+  nota: string | null
+}
+export interface Budget {
+  id: string
+  category_id: string | null
+  tope: string
+  periodo: string
+}
+export interface BudgetProgress extends Budget {
+  gastado: string
+  restante: string
+  porcentaje: number
+}
+export interface NuevaTransaccion {
+  tipo: string
+  monto: number
+  account_id: string
+  cuenta_destino_id?: string | null
+  category_id?: string | null
+  nota?: string | null
+}
+
 export const api = {
   login: (usuario: string, password: string) =>
     request<{ access_token: string }>('/auth/login', {
@@ -107,4 +149,36 @@ export const api = {
     }),
   deleteTask: (id: string) =>
     request<void>(`/tasks/${id}`, { method: 'DELETE' }),
+
+  // Finanzas
+  listAccounts: () => request<Account[]>('/accounts'),
+  createAccount: (nombre: string, tipo: string, saldoInicial: number) =>
+    request<Account>('/accounts', {
+      method: 'POST',
+      body: JSON.stringify({ nombre, tipo, saldo_inicial: saldoInicial }),
+    }),
+  listCategories: (soloActivas = true) =>
+    request<Category[]>(`/categories?solo_activas=${soloActivas}`),
+  listTransactions: () => request<Transaction[]>('/transactions'),
+  createTransaction: (t: NuevaTransaccion) =>
+    request<Transaction>('/transactions', {
+      method: 'POST',
+      body: JSON.stringify(t),
+    }),
+  deleteTransaction: (id: string) =>
+    request<void>(`/transactions/${id}`, { method: 'DELETE' }),
+  listBudgets: () => request<Budget[]>('/budgets'),
+  budgetProgress: (id: string) =>
+    request<BudgetProgress>(`/budgets/${id}/progreso`),
+  createBudget: (tope: number, categoryId: string | null) =>
+    request<Budget>('/budgets', {
+      method: 'POST',
+      body: JSON.stringify({ tope, category_id: categoryId }),
+    }),
+  deleteBudget: (id: string) =>
+    request<void>(`/budgets/${id}`, { method: 'DELETE' }),
+}
+
+export function fmtMoney(v: string | number): string {
+  return Number(v).toLocaleString('es-CO', { maximumFractionDigits: 0 })
 }

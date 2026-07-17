@@ -5,6 +5,7 @@ import Login from './pages/Login'
 import Notes from './pages/Notes'
 import Projects from './pages/Projects'
 import Board from './pages/Board'
+import Finanzas from './pages/Finanzas'
 import Placeholder from './pages/Placeholder'
 
 export default function App() {
@@ -27,7 +28,7 @@ export default function App() {
         <Route path="proyectos" element={<Projects />} />
         <Route path="proyectos/:id" element={<Board />} />
         <Route path="tareas" element={<Placeholder titulo="Tareas" />} />
-        <Route path="finanzas" element={<Placeholder titulo="Finanzas" />} />
+        <Route path="finanzas" element={<Finanzas />} />
         <Route
           path="responsabilidades"
           element={<Placeholder titulo="Responsabilidades" />}
