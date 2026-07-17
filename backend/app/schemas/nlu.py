@@ -5,8 +5,15 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+class Mensaje(BaseModel):
+    rol: str  # "user" | "assistant"
+    texto: str
+
+
 class InterpretRequest(BaseModel):
     texto: str = Field(min_length=1)
+    # Turnos previos de la conversación (memoria), del más viejo al más nuevo.
+    historial: list[Mensaje] = []
 
 
 class AccionOut(BaseModel):

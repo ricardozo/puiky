@@ -84,13 +84,33 @@ async def _responder_interpretacion(update: Update, res: dict) -> None:
     await update.message.reply_text(res.get("respuesta") or "Hecho.")
 
 
+_MAX_HISTORIAL = 8  # últimos 8 mensajes (~4 intercambios)
+
+
+def _historial(context: ContextTypes.DEFAULT_TYPE) -> list[dict]:
+    return context.chat_data.setdefault("historial", [])
+
+
+def _recordar(context, entrada: str, respuesta: str) -> None:
+    hist = _historial(context)
+    hist.append({"rol": "user", "texto": entrada})
+    hist.append({"rol": "assistant", "texto": respuesta})
+    context.chat_data["historial"] = hist[-_MAX_HISTORIAL:]
+
+
+async def _procesar(update: Update, context, entrada: str) -> None:
+    """Interpreta `entrada` con la memoria del chat y responde."""
+    res = await _client.interpret(entrada, _historial(context))
+    _recordar(context, entrada, res.get("respuesta") or "")
+    await _responder_interpretacion(update, res)
+
+
 async def texto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if await _bloquear_no_autorizado(update):
         return
     await update.effective_chat.send_action(ChatAction.TYPING)
     try:
-        res = await _client.interpret(update.message.text)
-        await _responder_interpretacion(update, res)
+        await _procesar(update, context, update.message.text)
     except Exception:
         logger.exception("Error interpretando texto")
         await update.message.reply_text("Ups, tuve un problema procesando eso.")
@@ -125,10 +145,9 @@ async def voz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         media = update.message.voice or update.message.audio
         archivo = await media.get_file()
         audio = bytes(await archivo.download_as_bytearray())
-        res = await _client.voice(audio)
-        transcrito = res.get("texto", "")
+        transcrito = await _client.transcribe(audio)
         await update.message.reply_text(f"🎙️ _{transcrito}_", parse_mode="Markdown")
-        await _responder_interpretacion(update, res)
+        await _procesar(update, context, transcrito)
     except Exception:
         logger.exception("Error procesando audio")
         await update.message.reply_text("Ups, no pude procesar el audio.")

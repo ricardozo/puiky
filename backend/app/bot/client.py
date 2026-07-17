@@ -32,24 +32,24 @@ class PuikyClient:
             {"Authorization": f"Bearer {service_token}"} if service_token else {}
         )
 
-    async def interpret(self, texto: str) -> dict:
+    async def interpret(self, texto: str, historial: list | None = None) -> dict:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as c:
             r = await c.post(
                 f"{self._base}/nlu/interpret",
-                json={"texto": texto},
+                json={"texto": texto, "historial": historial or []},
                 headers=self._headers,
             )
             r.raise_for_status()
             return r.json()
 
-    async def voice(self, audio: bytes, filename: str = "voz.ogg") -> dict:
+    async def transcribe(self, audio: bytes, filename: str = "voz.ogg") -> str:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as c:
             files = {"file": (filename, audio, "audio/ogg")}
             r = await c.post(
-                f"{self._base}/nlu/voice", files=files, headers=self._headers
+                f"{self._base}/nlu/transcribe", files=files, headers=self._headers
             )
             r.raise_for_status()
-            return r.json()
+            return r.json().get("texto", "")
 
     async def delete_entity(self, tipo: str, entidad_id: str) -> None:
         base = _RUTAS.get(tipo)

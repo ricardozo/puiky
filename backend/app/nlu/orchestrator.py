@@ -78,14 +78,21 @@ def _system_prompt(db: Session) -> str:
 
 
 def interpret(
-    db: Session, texto: str, provider: LLMProvider | None = None
+    db: Session,
+    texto: str,
+    provider: LLMProvider | None = None,
+    historial: list | None = None,
 ) -> InterpretResult:
     provider = provider or get_llm_provider()
     tools = openai_tools()
-    messages: list[dict] = [
-        {"role": "system", "content": _system_prompt(db)},
-        {"role": "user", "content": texto},
-    ]
+    messages: list[dict] = [{"role": "system", "content": _system_prompt(db)}]
+    # Memoria de conversación: turnos previos (para aclaraciones y contexto).
+    for m in historial or []:
+        rol = getattr(m, "rol", None) or m.get("rol")
+        contenido = getattr(m, "texto", None) or m.get("texto")
+        if rol in ("user", "assistant") and contenido:
+            messages.append({"role": rol, "content": contenido})
+    messages.append({"role": "user", "content": texto})
 
     resp = provider.chat(messages, tools)
     if not resp.tool_calls:

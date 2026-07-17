@@ -34,7 +34,9 @@ def interpretar(
     data: InterpretRequest, db: Session = Depends(get_db)
 ) -> InterpretResponse:
     """Interpreta texto en lenguaje natural y ejecuta las acciones."""
-    respuesta, acciones = _a_response(interpret(db, data.texto))
+    respuesta, acciones = _a_response(
+        interpret(db, data.texto, historial=data.historial)
+    )
     return InterpretResponse(respuesta=respuesta, acciones=acciones)
 
 
