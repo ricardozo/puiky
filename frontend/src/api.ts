@@ -106,6 +106,24 @@ export interface NuevaTransaccion {
   nota?: string | null
 }
 
+export interface Reminder {
+  id: string
+  origen_tipo: string | null
+  origen_id: string | null
+  texto: string
+  disparar_en: string
+  veces_avisado: number
+  pospuesto_para: string | null
+  resuelto: boolean
+}
+export interface Responsibility {
+  id: string
+  nombre: string
+  recurrencia: string
+  proximo_venc: string
+  monto: string | null
+}
+
 export const api = {
   login: (usuario: string, password: string) =>
     request<{ access_token: string }>('/auth/login', {
@@ -177,8 +195,58 @@ export const api = {
     }),
   deleteBudget: (id: string) =>
     request<void>(`/budgets/${id}`, { method: 'DELETE' }),
+
+  // Recordatorios
+  listReminders: (resuelto?: boolean) =>
+    request<Reminder[]>(
+      `/reminders${resuelto === undefined ? '' : `?resuelto=${resuelto}`}`
+    ),
+  createReminder: (texto: string, dispararEn: string) =>
+    request<Reminder>('/reminders', {
+      method: 'POST',
+      body: JSON.stringify({ texto, disparar_en: dispararEn }),
+    }),
+  snoozeReminder: (id: string, pospuestoPara: string) =>
+    request<Reminder>(`/reminders/${id}/snooze`, {
+      method: 'POST',
+      body: JSON.stringify({ pospuesto_para: pospuestoPara }),
+    }),
+  resolveReminder: (id: string) =>
+    request<Reminder>(`/reminders/${id}/resolve`, { method: 'POST' }),
+  deleteReminder: (id: string) =>
+    request<void>(`/reminders/${id}`, { method: 'DELETE' }),
+
+  // Responsabilidades
+  listResponsibilities: () => request<Responsibility[]>('/responsibilities'),
+  createResponsibility: (
+    nombre: string,
+    recurrencia: string,
+    proximoVenc: string,
+    monto: number | null
+  ) =>
+    request<Responsibility>('/responsibilities', {
+      method: 'POST',
+      body: JSON.stringify({
+        nombre,
+        recurrencia,
+        proximo_venc: proximoVenc,
+        monto,
+      }),
+    }),
+  fulfillResponsibility: (id: string) =>
+    request<Responsibility>(`/responsibilities/${id}/fulfill`, {
+      method: 'POST',
+    }),
+  deleteResponsibility: (id: string) =>
+    request<void>(`/responsibilities/${id}`, { method: 'DELETE' }),
 }
 
 export function fmtMoney(v: string | number): string {
   return Number(v).toLocaleString('es-CO', { maximumFractionDigits: 0 })
 }
+
+// datetime-local ("YYYY-MM-DDTHH:MM") -> ISO con offset de Colombia (-05:00).
+export function aISOColombia(local: string): string {
+  return `${local}:00-05:00`
+}
+

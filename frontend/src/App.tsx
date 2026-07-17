@@ -6,6 +6,8 @@ import Notes from './pages/Notes'
 import Projects from './pages/Projects'
 import Board from './pages/Board'
 import Finanzas from './pages/Finanzas'
+import Recordatorios from './pages/Recordatorios'
+import Responsabilidades from './pages/Responsabilidades'
 import Placeholder from './pages/Placeholder'
 
 export default function App() {
@@ -29,14 +31,8 @@ export default function App() {
         <Route path="proyectos/:id" element={<Board />} />
         <Route path="tareas" element={<Placeholder titulo="Tareas" />} />
         <Route path="finanzas" element={<Finanzas />} />
-        <Route
-          path="responsabilidades"
-          element={<Placeholder titulo="Responsabilidades" />}
-        />
-        <Route
-          path="recordatorios"
-          element={<Placeholder titulo="Recordatorios" />}
-        />
+        <Route path="responsabilidades" element={<Responsabilidades />} />
+        <Route path="recordatorios" element={<Recordatorios />} />
         <Route path="*" element={<Navigate to="/notas" replace />} />
       </Route>
     </Routes>
