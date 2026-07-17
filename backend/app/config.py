@@ -28,6 +28,19 @@ class Settings(BaseSettings):
     # (vector determinista sin torch, para tests/CI y arranque rápido).
     embed_backend: str = "real"
 
+    # --- NLU / LLM (tool calling) ---
+    # "real" (endpoint OpenAI-compatible, p. ej. Ollama con Qwen) o "fake"
+    # (intérprete determinista por reglas, para desarrollo y tests sin modelo).
+    llm_backend: str = "fake"
+    llm_base_url: str = "http://localhost:11434/v1"  # Ollama por defecto
+    llm_model: str = "qwen3:14b"
+    llm_api_key: str = "ollama"  # Ollama ignora la clave; el SDK la exige
+
+    # --- Transcripción (Whisper) ---
+    # "real" (faster-whisper) o "fake" (texto fijo, para probar el flujo).
+    whisper_backend: str = "fake"
+    whisper_model: str = "base"
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def database_url(self) -> str:

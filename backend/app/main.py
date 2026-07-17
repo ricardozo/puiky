@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from app.routers import (
     finances,
+    nlu,
     notes,
     projects,
     reminders,
@@ -33,3 +34,4 @@ app.include_router(finances.categories_router)
 app.include_router(finances.transactions_router)
 app.include_router(finances.budgets_router)
 app.include_router(reminders.router)
+app.include_router(nlu.router)

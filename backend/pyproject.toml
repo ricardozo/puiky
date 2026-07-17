@@ -13,6 +13,9 @@ dependencies = [
     "pydantic-settings>=2.5",
     "sentence-transformers>=3.0",
     "torch>=2.2",
+    "openai>=1.50",
+    "faster-whisper>=1.0",
+    "python-multipart>=0.0.9",
 ]
 
 [dependency-groups]

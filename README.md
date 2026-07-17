@@ -6,13 +6,15 @@ Asistente personal de un solo usuario: notas con búsqueda semántica, tareas,
 proyectos, responsabilidades recurrentes, finanzas y recordatorios.
 Documentación de diseño en [docs/](docs/).
 
-**Estado:** Fase 1 (backend / API) **completa**. Dominios listos: **notas**
-(CRUD, vínculos, búsqueda semántica con pgvector), **proyectos** y **tareas**
-(Kanban por estado, avance/completar, hoy/pendientes), **responsabilidades**
-(recurrencia que se recalcula al cumplirse), **finanzas** (cuentas con saldo,
-categorías, movimientos con transferencias, reportes de gasto, presupuestos con
-avance) y **recordatorios** (posponer, resolver, vencidos). Pendientes: entidad
-USER + autenticación, capa NLU (Qwen), canal Telegram, scheduler y frontend.
+**Estado:** Fase 1 (backend / API) **completa** y Fase 2 (**NLU**) con el núcleo
+de tool-calling y transcripción de audio. Dominios: **notas** (CRUD, vínculos,
+búsqueda semántica con pgvector), **proyectos** y **tareas** (Kanban por estado,
+avance/completar, hoy/pendientes), **responsabilidades** (recurrencia que se
+recalcula al cumplirse), **finanzas** (cuentas con saldo, categorías, movimientos
+con transferencias, reportes de gasto, presupuestos con avance) y **recordatorios**
+(posponer, resolver, vencidos). **NLU**: lenguaje natural → acciones, con Qwen
+(Ollama) intercambiable por un intérprete `fake`, y audio→texto con Whisper.
+Pendientes: entidad USER + autenticación, canal Telegram, scheduler y frontend.
 
 ## Estructura
 
@@ -52,6 +54,10 @@ Listo. Idéntico en Windows y Ubuntu.
 
 - **Swagger UI (probar todo sin frontend):** http://localhost:8000/docs
 - Chequeo de vida: http://localhost:8000/health
+
+> **Al cambiar dependencias** (editar `pyproject.toml`): reconstruye la imagen y
+> **renueva el volumen del venv**, que si no tapa el nuevo con el viejo:
+> `docker compose up -d --build --force-recreate --renew-anon-volumes app`
 
 > La primera vez, el backend `real` de embeddings descarga
 > `multilingual-e5-base` (~1 GB) y lo guarda en un volumen; los siguientes
@@ -165,6 +171,22 @@ categoría.
 | POST   | `/reminders/{id}/notified` | Registrar aviso enviado (para el scheduler) |
 | POST   | `/reminders/{id}/resolve`  | Marcar resuelto |
 | DELETE | `/reminders/{id}`          | Eliminar |
+
+### Endpoints de NLU (Fase 2)
+
+Traducen lenguaje natural a las operaciones anteriores. Sirven para probar el
+tool-calling sin Telegram (el bot de la Fase 3 usará estos mismos).
+
+| Método | Ruta | Qué hace |
+|--------|------|----------|
+| POST   | `/nlu/interpret`  | Texto → acciones (crea nota, registra gasto, …) |
+| POST   | `/nlu/transcribe` | Audio → texto (Whisper) |
+| POST   | `/nlu/voice`      | Audio → texto → acciones (flujo del bot) |
+
+**Modelo:** por defecto `LLM_BACKEND=fake` (intérprete determinista, sin modelo).
+Para usar el Qwen real, en `.env`: `LLM_BACKEND=real` y `LLM_BASE_URL` apuntando
+a Ollama (en el servidor, o vía túnel `ssh -L 11434:localhost:11434 usuario@servidor`).
+Igual para el audio: `WHISPER_BACKEND=real`.
 
 ## Tests
 
