@@ -14,7 +14,7 @@ from app.config import get_settings
 logger = logging.getLogger("puiky.bot")
 
 _settings = get_settings()
-_client = PuikyClient(_settings.puiky_api_url)
+_client = PuikyClient(_settings.puiky_api_url, _settings.service_token)
 
 BIENVENIDA = (
     "*Hola, soy Puiky*\n"

@@ -8,6 +8,7 @@ from app.models.projects import Project
 from app.models.reminders import Reminder
 from app.models.responsibilities import Responsibility
 from app.models.tasks import Task
+from app.models.users import User
 
 __all__ = [
     "Base",
@@ -21,4 +22,5 @@ __all__ = [
     "Responsibility",
     "Task",
     "Transaction",
+    "User",
 ]

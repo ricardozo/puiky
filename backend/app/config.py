@@ -55,6 +55,21 @@ class Settings(BaseSettings):
             int(x) for x in self.telegram_allowed_ids.split(",") if x.strip().isdigit()
         }
 
+    # --- Autenticación (Fase 5) ---
+    # Secreto para firmar los JWT de sesión (cámbialo en .env).
+    jwt_secret: str = "cambia-este-secreto"
+    jwt_expire_minutes: int = 60 * 24 * 7  # 7 días
+    # Token de servicio para llamantes internos de confianza (el bot). Se envía
+    # como Bearer y evita usar el login humano. Distinto del token de sesión.
+    service_token: str = ""
+    # Orígenes permitidos para CORS (el dev server de Vite), separados por coma.
+    cors_origins: str = "http://localhost:5173"
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
     # --- Zona horaria (Fase 4) ---
     timezone: str = "America/Bogota"
 
