@@ -41,6 +41,20 @@ class Settings(BaseSettings):
     whisper_backend: str = "fake"
     whisper_model: str = "base"
 
+    # --- Canal Telegram (Fase 3) ---
+    telegram_bot_token: str = ""
+    # IDs de Telegram autorizados, separados por coma (allowlist del bot).
+    telegram_allowed_ids: str = ""
+    # URL de la API de Puiky vista desde el contenedor del bot.
+    puiky_api_url: str = "http://app:8000"
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def allowed_ids(self) -> set[int]:
+        return {
+            int(x) for x in self.telegram_allowed_ids.split(",") if x.strip().isdigit()
+        }
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def database_url(self) -> str:

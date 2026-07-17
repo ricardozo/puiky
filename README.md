@@ -14,7 +14,9 @@ recalcula al cumplirse), **finanzas** (cuentas con saldo, categorías, movimient
 con transferencias, reportes de gasto, presupuestos con avance) y **recordatorios**
 (posponer, resolver, vencidos). **NLU**: lenguaje natural → acciones, con Qwen
 (Ollama) intercambiable por un intérprete `fake`, y audio→texto con Whisper.
-Pendientes: entidad USER + autenticación, canal Telegram, scheduler y frontend.
+**Telegram (Fase 3)**: bot con long-polling que recibe texto y audio, los pasa
+por la NLU y responde; seguridad por allowlist de IDs. Pendientes: entidad USER +
+autenticación web, scheduler (recordatorios proactivos) y frontend.
 
 ## Estructura
 
@@ -58,6 +60,23 @@ Listo. Idéntico en Windows y Ubuntu.
 > **Al cambiar dependencias** (editar `pyproject.toml`): reconstruye la imagen y
 > **renueva el volumen del venv**, que si no tapa el nuevo con el viejo:
 > `docker compose up -d --build --force-recreate --renew-anon-volumes app`
+
+### Bot de Telegram (Fase 3)
+
+El bot es un servicio aparte (perfil `bot`) que usa long-polling y llama a la API
+por HTTP. No necesita IP pública ni puertos abiertos.
+
+1. Crea el bot con [@BotFather](https://t.me/BotFather) y copia el token.
+2. En `.env`: `TELEGRAM_BOT_TOKEN=...`. Deja `TELEGRAM_ALLOWED_IDS` vacío la
+   primera vez.
+3. Levanta el bot: `docker compose --profile bot up -d bot`
+4. Mándale un mensaje: te responderá con tu **ID de Telegram**. Ponlo en
+   `TELEGRAM_ALLOWED_IDS=<tu_id>` y reinícialo
+   (`docker compose --profile bot up -d bot`). Ya solo te atenderá a ti.
+
+Háblale por texto o audio con naturalidad ("gasté 20 mil en mercado con
+efectivo"); el bot pasa el mensaje por la capa NLU y responde. Con
+`WHISPER_BACKEND=real` transcribe las notas de voz.
 
 > La primera vez, el backend `real` de embeddings descarga
 > `multilingual-e5-base` (~1 GB) y lo guarda en un volumen; los siguientes
