@@ -251,6 +251,18 @@ function TaskEditor({
     await api.deleteTask(task.id)
     onClose()
   }
+  const hoy = () => {
+    const d = new Date()
+    const p = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+  }
+  const completar = async () => {
+    let t = await api.completeTask(task.id)
+    if (!t.fecha_fin_real) t = await api.updateTask(task.id, { fecha_fin_real: hoy() })
+    setTask(t)
+  }
+  const reabrir = async () =>
+    setTask(await api.updateTask(task.id, { estado: 'en_ejecucion' }))
 
   const done = task.checklist.filter((i) => i.hecho).length
 
@@ -280,6 +292,21 @@ function TaskEditor({
             {task.estado}
           </span>
           <span className="text-slate-400">{task.avance_pct}% avance</span>
+          {task.estado === 'terminada' ? (
+            <button
+              onClick={reabrir}
+              className="ml-auto rounded-lg border border-slate-700 px-3 py-1 hover:bg-slate-800"
+            >
+              Reabrir
+            </button>
+          ) : (
+            <button
+              onClick={completar}
+              className="ml-auto rounded-lg bg-emerald-600/80 hover:bg-emerald-600 px-3 py-1 font-medium"
+            >
+              Marcar completada
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-3">

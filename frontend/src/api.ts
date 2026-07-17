@@ -265,8 +265,10 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ estado }),
     }),
-  updateTask: (id: string, data: TaskFechas) =>
+  updateTask: (id: string, data: TaskFechas & { estado?: string }) =>
     request<Task>(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  completeTask: (id: string) =>
+    request<Task>(`/tasks/${id}/complete`, { method: 'POST' }),
   deleteTask: (id: string) =>
     request<void>(`/tasks/${id}`, { method: 'DELETE' }),
   addChecklistItem: (taskId: string, texto: string) =>
