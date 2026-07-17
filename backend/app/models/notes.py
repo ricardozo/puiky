@@ -20,12 +20,19 @@ class Note(Base):
     """El núcleo del sistema: la memoria (segundo cerebro)."""
 
     __tablename__ = "note"
+    __table_args__ = (Index("ix_note_notebook_id", "notebook_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
     )
     contenido: Mapped[str] = mapped_column(Text, nullable=False)
     embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIM), nullable=False)
+    # Cuaderno al que pertenece la nota (opcional: null = sin cuaderno).
+    notebook_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("notebook.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     creada: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

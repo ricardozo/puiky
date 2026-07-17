@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.embeddings import get_embedder
 from app.models.finances import Account
+from app.models.notebooks import Notebook
 from app.models.notes import Note, NoteLink
 from app.models.projects import Project
 from app.models.responsibilities import Responsibility
@@ -26,10 +27,20 @@ _MODELOS_VALIDABLES = {
 }
 
 
+def _validar_cuaderno(db: Session, notebook_id: uuid.UUID | None) -> None:
+    if notebook_id is not None and db.get(Notebook, notebook_id) is None:
+        raise ValueError("El cuaderno indicado no existe")
+
+
 def create_note(db: Session, data: NoteCreate) -> Note:
     """Crea una nota generando y guardando su embedding."""
+    _validar_cuaderno(db, data.notebook_id)
     embedding = get_embedder().embed_document(data.contenido)
-    note = Note(contenido=data.contenido, embedding=embedding)
+    note = Note(
+        contenido=data.contenido,
+        embedding=embedding,
+        notebook_id=data.notebook_id,
+    )
     db.add(note)
     db.commit()
     db.refresh(note)
@@ -44,21 +55,38 @@ def get_note(db: Session, note_id: uuid.UUID) -> Note | None:
     return db.execute(stmt).scalar_one_or_none()
 
 
-def list_notes(db: Session, limit: int = 50, offset: int = 0) -> list[Note]:
-    """Lista notas, de la más reciente a la más antigua."""
-    stmt = (
-        select(Note).order_by(Note.creada.desc()).limit(limit).offset(offset)
-    )
+# Centinela para distinguir "sin cuaderno" (None) de "sin filtro".
+_SIN_FILTRO = object()
+
+
+def list_notes(
+    db: Session,
+    limit: int = 50,
+    offset: int = 0,
+    notebook_id: uuid.UUID | None | object = _SIN_FILTRO,
+) -> list[Note]:
+    """Lista notas, de la más reciente a la más antigua. Filtra por cuaderno
+    si se pasa `notebook_id` (None = solo las sin cuaderno)."""
+    stmt = select(Note)
+    if notebook_id is not _SIN_FILTRO:
+        stmt = stmt.where(Note.notebook_id == notebook_id)
+    stmt = stmt.order_by(Note.creada.desc()).limit(limit).offset(offset)
     return list(db.execute(stmt).scalars().all())
 
 
 def update_note(db: Session, note_id: uuid.UUID, data: NoteUpdate) -> Note | None:
-    """Edita el contenido y recalcula el embedding. None si no existe."""
+    """Edita contenido (recalcula embedding) y/o mueve de cuaderno. Solo los
+    campos enviados cambian. None si la nota no existe."""
     note = db.get(Note, note_id)
     if note is None:
         return None
-    note.contenido = data.contenido
-    note.embedding = get_embedder().embed_document(data.contenido)
+    cambios = data.model_dump(exclude_unset=True)
+    if "notebook_id" in cambios:
+        _validar_cuaderno(db, cambios["notebook_id"])
+        note.notebook_id = cambios["notebook_id"]
+    if cambios.get("contenido"):
+        note.contenido = cambios["contenido"]
+        note.embedding = get_embedder().embed_document(cambios["contenido"])
     db.commit()
     db.refresh(note)
     return note

@@ -25,10 +25,15 @@ class EntidadTipo(str, Enum):
 
 class NoteCreate(BaseModel):
     contenido: str = Field(min_length=1)
+    notebook_id: uuid.UUID | None = None
 
 
 class NoteUpdate(BaseModel):
-    contenido: str = Field(min_length=1)
+    """Actualización parcial: solo los campos enviados cambian. `notebook_id`
+    admite null explícito para sacar la nota de su cuaderno."""
+
+    contenido: str | None = Field(default=None, min_length=1)
+    notebook_id: uuid.UUID | None = None
 
 
 class NoteOut(BaseModel):
@@ -36,6 +41,7 @@ class NoteOut(BaseModel):
 
     id: uuid.UUID
     contenido: str
+    notebook_id: uuid.UUID | None
     creada: datetime
 
 

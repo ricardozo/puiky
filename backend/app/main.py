@@ -9,6 +9,7 @@ from app.routers import (
     auth,
     finances,
     nlu,
+    notebooks,
     notes,
     projects,
     reminders,
@@ -43,6 +44,7 @@ app.include_router(auth.router)
 # Todos los dominios requieren autenticación (usuario web o token de servicio).
 _protegido = [Depends(require_auth)]
 app.include_router(notes.router, dependencies=_protegido)
+app.include_router(notebooks.router, dependencies=_protegido)
 app.include_router(projects.router, dependencies=_protegido)
 app.include_router(tasks.router, dependencies=_protegido)
 app.include_router(responsibilities.router, dependencies=_protegido)

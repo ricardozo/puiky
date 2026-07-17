@@ -47,10 +47,18 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
 export interface Note {
   id: string
   contenido: string
+  notebook_id: string | null
   creada: string
 }
 export interface SearchResult extends Note {
   similitud: number
+}
+export interface Notebook {
+  id: string
+  nombre: string
+  descripcion: string | null
+  creada: string
+  notas: number
 }
 
 export interface Project {
@@ -139,11 +147,21 @@ export const api = {
       body: JSON.stringify({ usuario, password }),
     }),
   me: () => request<{ usuario: string }>('/auth/me'),
-  listNotes: () => request<Note[]>('/notes'),
-  createNote: (contenido: string) =>
+  listNotes: (opts?: { notebookId?: string; sinCuaderno?: boolean }) => {
+    let q = ''
+    if (opts?.sinCuaderno) q = '?sin_cuaderno=true'
+    else if (opts?.notebookId) q = `?notebook_id=${opts.notebookId}`
+    return request<Note[]>(`/notes${q}`)
+  },
+  createNote: (contenido: string, notebookId?: string | null) =>
     request<Note>('/notes', {
       method: 'POST',
-      body: JSON.stringify({ contenido }),
+      body: JSON.stringify({ contenido, notebook_id: notebookId ?? null }),
+    }),
+  moveNote: (id: string, notebookId: string | null) =>
+    request<Note>(`/notes/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ notebook_id: notebookId }),
     }),
   searchNotes: (texto: string) =>
     request<SearchResult[]>('/notes/search', {
@@ -152,6 +170,16 @@ export const api = {
     }),
   deleteNote: (id: string) =>
     request<void>(`/notes/${id}`, { method: 'DELETE' }),
+
+  // Cuadernos
+  listNotebooks: () => request<Notebook[]>('/notebooks'),
+  createNotebook: (nombre: string, descripcion?: string) =>
+    request<Notebook>('/notebooks', {
+      method: 'POST',
+      body: JSON.stringify({ nombre, descripcion: descripcion || null }),
+    }),
+  deleteNotebook: (id: string) =>
+    request<void>(`/notebooks/${id}`, { method: 'DELETE' }),
 
   // Proyectos
   listProjects: () => request<Project[]>('/projects'),

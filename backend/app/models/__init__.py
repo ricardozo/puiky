@@ -3,6 +3,7 @@
 
 from app.models.base import Base
 from app.models.finances import Account, Budget, Category, Transaction
+from app.models.notebooks import Notebook
 from app.models.notes import Note, NoteLink
 from app.models.projects import Project
 from app.models.reminders import Reminder
@@ -17,6 +18,7 @@ __all__ = [
     "Category",
     "Note",
     "NoteLink",
+    "Notebook",
     "Project",
     "Reminder",
     "Responsibility",
