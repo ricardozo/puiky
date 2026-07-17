@@ -11,6 +11,7 @@ from app.routers import (
     nlu,
     notebooks,
     notes,
+    portfolios,
     projects,
     reminders,
     responsibilities,
@@ -45,6 +46,7 @@ app.include_router(auth.router)
 _protegido = [Depends(require_auth)]
 app.include_router(notes.router, dependencies=_protegido)
 app.include_router(notebooks.router, dependencies=_protegido)
+app.include_router(portfolios.router, dependencies=_protegido)
 app.include_router(projects.router, dependencies=_protegido)
 app.include_router(tasks.router, dependencies=_protegido)
 app.include_router(responsibilities.router, dependencies=_protegido)

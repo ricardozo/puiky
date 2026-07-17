@@ -68,6 +68,14 @@ export interface Project {
   nombre: string
   descripcion: string | null
   estado: string
+  portfolio_id: string | null
+}
+export interface Portfolio {
+  id: string
+  nombre: string
+  descripcion: string | null
+  creada: string
+  proyectos: number
 }
 export interface Task {
   id: string
@@ -201,13 +209,33 @@ export const api = {
     request<void>(`/notebooks/${id}`, { method: 'DELETE' }),
 
   // Proyectos
-  listProjects: () => request<Project[]>('/projects'),
+  listProjects: (opts?: { portfolioId?: string; sinPortafolio?: boolean }) => {
+    let q = ''
+    if (opts?.sinPortafolio) q = '?sin_portafolio=true'
+    else if (opts?.portfolioId) q = `?portfolio_id=${opts.portfolioId}`
+    return request<Project[]>(`/projects${q}`)
+  },
   getProject: (id: string) => request<ProjectDetail>(`/projects/${id}`),
-  createProject: (nombre: string, descripcion?: string) =>
+  createProject: (nombre: string, portfolioId?: string | null) =>
     request<Project>('/projects', {
+      method: 'POST',
+      body: JSON.stringify({ nombre, portfolio_id: portfolioId ?? null }),
+    }),
+  moveProject: (id: string, portfolioId: string | null) =>
+    request<Project>(`/projects/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ portfolio_id: portfolioId }),
+    }),
+
+  // Portafolios
+  listPortfolios: () => request<Portfolio[]>('/portfolios'),
+  createPortfolio: (nombre: string, descripcion?: string) =>
+    request<Portfolio>('/portfolios', {
       method: 'POST',
       body: JSON.stringify({ nombre, descripcion: descripcion || null }),
     }),
+  deletePortfolio: (id: string) =>
+    request<void>(`/portfolios/${id}`, { method: 'DELETE' }),
 
   // Tareas
   createTask: (titulo: string, projectId: string) =>

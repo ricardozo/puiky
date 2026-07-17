@@ -5,6 +5,7 @@ from app.models.base import Base
 from app.models.finances import Account, Budget, Category, Transaction
 from app.models.notebooks import Notebook
 from app.models.notes import Note, NoteLink
+from app.models.portfolios import Portfolio
 from app.models.projects import Project
 from app.models.reminders import Reminder
 from app.models.responsibilities import Responsibility
@@ -19,6 +20,7 @@ __all__ = [
     "Note",
     "NoteLink",
     "Notebook",
+    "Portfolio",
     "Project",
     "Reminder",
     "Responsibility",
