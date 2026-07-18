@@ -18,12 +18,14 @@ from sqlalchemy.orm import Session
 from app.models.finances import Account, Category
 from app.models.notebooks import Notebook
 from app.models.notes import Note
+from app.models.portfolios import Portfolio
 from app.models.projects import Project
 from app.models.tasks import Task
 from app.schemas.finances import AccountCreate, TransactionCreate, TransactionTipo
 from app.schemas.notebooks import NotebookCreate
 from app.schemas.notes import NoteCreate, NoteLinkCreate, NoteUpdate
-from app.schemas.projects import ProjectCreate
+from app.schemas.portfolios import PortfolioCreate
+from app.schemas.projects import ProjectCreate, ProjectEstado, ProjectUpdate
 from app.schemas.reminders import ReminderCreate
 from app.schemas.responsibilities import ResponsibilityCreate
 from app.schemas.tasks import (
@@ -36,6 +38,7 @@ from app.schemas.tasks import (
 from app.services import finances as fin
 from app.services import notebooks as nb_svc
 from app.services import notes as notes_svc
+from app.services import portfolios as pf_svc
 from app.services import projects as proj_svc
 from app.services import reminders as rem_svc
 from app.services import responsibilities as resp_svc
@@ -102,6 +105,10 @@ def _resolver_proyecto(db: Session, ref: str) -> Project:
 
 def _resolver_cuaderno(db: Session, ref: str) -> Notebook:
     return _resolver(db, Notebook, Notebook.nombre, ref, "un cuaderno")
+
+
+def _resolver_portafolio(db: Session, ref: str) -> Portfolio:
+    return _resolver(db, Portfolio, Portfolio.nombre, ref, "un portafolio")
 
 
 def _resolver_item(tarea: Task, ref: str):
@@ -241,11 +248,99 @@ def _listar_cuadernos(db: Session, a: dict) -> dict:
 # --- Handlers: resto ---
 
 
+def _crear_portafolio(db: Session, a: dict) -> dict:
+    pf = pf_svc.create_portfolio(db, PortfolioCreate(nombre=a["nombre"]))
+    return {"ok": True, "portafolio": pf.nombre}
+
+
+def _listar_portafolios(db: Session, a: dict) -> dict:
+    return {
+        "ok": True,
+        "portafolios": [
+            {"nombre": pf.nombre, "proyectos": n}
+            for pf, n in pf_svc.list_portfolios(db)
+        ],
+    }
+
+
+def _eliminar_portafolio(db: Session, a: dict) -> dict:
+    pf = _resolver_portafolio(db, a["portafolio"])
+    return {
+        "ok": True,
+        "confirmar": {
+            "tipo": "portfolio",
+            "id": str(pf.id),
+            "que": f"el portafolio «{pf.nombre}» (sus proyectos quedan sueltos)",
+        },
+    }
+
+
 def _crear_proyecto(db: Session, a: dict) -> dict:
-    p = proj_svc.create_project(
-        db, ProjectCreate(nombre=a["nombre"], descripcion=a.get("descripcion"))
+    pf_id = (
+        _resolver_portafolio(db, a["portafolio"]).id if a.get("portafolio") else None
     )
-    return {"ok": True, "proyecto_id": str(p.id), "nombre": p.nombre}
+    p = proj_svc.create_project(
+        db,
+        ProjectCreate(
+            nombre=a["nombre"],
+            descripcion=a.get("descripcion"),
+            portfolio_id=pf_id,
+        ),
+    )
+    return {"ok": True, "proyecto": p.nombre, "portafolio": a.get("portafolio")}
+
+
+def _listar_proyectos(db: Session, a: dict) -> dict:
+    if a.get("portafolio"):
+        pf_id = _resolver_portafolio(db, a["portafolio"]).id
+        proys = proj_svc.list_projects(db, portfolio_id=pf_id)
+    else:
+        proys = proj_svc.list_projects(db)
+    return {
+        "ok": True,
+        "proyectos": [{"nombre": p.nombre, "estado": p.estado} for p in proys],
+    }
+
+
+def _ver_proyecto(db: Session, a: dict) -> dict:
+    proyecto = _resolver_proyecto(db, a["proyecto"])
+    p = proj_svc.get_project(db, proyecto.id)
+    notas = notes_svc.notes_for_entity(db, "project", proyecto.id)
+    return {
+        "ok": True,
+        "proyecto": p.nombre,
+        "estado": p.estado,
+        "tareas": [_resumen_tarea(t) for t in p.tasks],
+        "notas": [_etiqueta_hoja(n) for n in notas],
+    }
+
+
+def _mover_proyecto(db: Session, a: dict) -> dict:
+    proyecto = _resolver_proyecto(db, a["proyecto"])
+    pf = _resolver_portafolio(db, a["portafolio"])
+    proj_svc.update_project(db, proyecto.id, ProjectUpdate(portfolio_id=pf.id))
+    return {"ok": True, "proyecto": proyecto.nombre, "portafolio": pf.nombre}
+
+
+def _archivar_proyecto(db: Session, a: dict) -> dict:
+    proyecto = _resolver_proyecto(db, a["proyecto"])
+    p = proj_svc.archive_project(db, proyecto.id)
+    return {"ok": True, "proyecto": p.nombre, "estado": p.estado}
+
+
+def _editar_proyecto(db: Session, a: dict) -> dict:
+    proyecto = _resolver_proyecto(db, a["proyecto"])
+    campos: dict[str, Any] = {}
+    if a.get("nuevo_nombre"):
+        campos["nombre"] = a["nuevo_nombre"]
+    if a.get("descripcion") is not None:
+        campos["descripcion"] = a["descripcion"]
+    if a.get("estado"):
+        campos["estado"] = ProjectEstado(a["estado"])
+    if not campos:
+        raise ValueError("No indicaste qué cambiar del proyecto.")
+    p = proj_svc.update_project(db, proyecto.id, ProjectUpdate(**campos))
+    return {"ok": True, "proyecto": p.nombre, "estado": p.estado}
 
 
 def _crear_tarea(db: Session, a: dict) -> dict:
@@ -552,12 +647,70 @@ TOOLS: list[Tool] = [
         _p({}, []),
         _listar_cuadernos,
     ),
-    # --- Proyectos y tareas ---
+    # --- Portafolios ---
+    Tool(
+        "crear_portafolio",
+        "Crea un portafolio para agrupar proyectos.",
+        _p({"nombre": _STR}, ["nombre"]),
+        _crear_portafolio,
+    ),
+    Tool(
+        "listar_portafolios",
+        "Lista los portafolios y cuántos proyectos tiene cada uno.",
+        _p({}, []),
+        _listar_portafolios,
+    ),
+    Tool(
+        "eliminar_portafolio",
+        "Elimina un portafolio (los proyectos quedan sueltos). Pide confirmación.",
+        _p({"portafolio": _STR}, ["portafolio"]),
+        _eliminar_portafolio,
+    ),
+    # --- Proyectos ---
     Tool(
         "crear_proyecto",
-        "Crea un proyecto que agrupa tareas y notas.",
-        _p({"nombre": _STR, "descripcion": _STR}, ["nombre"]),
+        "Crea un proyecto que agrupa tareas y notas. Portafolio opcional (por nombre).",
+        _p({"nombre": _STR, "descripcion": _STR, "portafolio": _STR}, ["nombre"]),
         _crear_proyecto,
+    ),
+    Tool(
+        "listar_proyectos",
+        "Lista los proyectos (o los de un portafolio si se indica).",
+        _p({"portafolio": _STR}, []),
+        _listar_proyectos,
+    ),
+    Tool(
+        "ver_proyecto",
+        "Muestra un proyecto con sus tareas y sus notas vinculadas (por su nombre).",
+        _p({"proyecto": _STR}, ["proyecto"]),
+        _ver_proyecto,
+    ),
+    Tool(
+        "mover_proyecto",
+        "Mueve un proyecto a un portafolio.",
+        _p({"proyecto": _STR, "portafolio": _STR}, ["proyecto", "portafolio"]),
+        _mover_proyecto,
+    ),
+    Tool(
+        "archivar_proyecto",
+        "Archiva un proyecto (pasa a estado terminado).",
+        _p({"proyecto": _STR}, ["proyecto"]),
+        _archivar_proyecto,
+    ),
+    Tool(
+        "editar_proyecto",
+        "Edita un proyecto (por su nombre): nuevo_nombre, descripción y/o estado "
+        "(activo|pausado|terminado).",
+        _p(
+            {
+                "proyecto": _STR,
+                "nuevo_nombre": _STR,
+                "descripcion": _STR,
+                "estado": _STR,
+            },
+            ["proyecto"],
+        ),
+        _editar_proyecto,
     ),
     Tool(
         "crear_tarea",

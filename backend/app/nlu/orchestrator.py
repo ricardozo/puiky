@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.models.finances import Account, Category
 from app.models.notebooks import Notebook
+from app.models.portfolios import Portfolio
 from app.models.projects import Project
 from app.nlu.provider import LLMProvider, get_llm_provider
 from app.nlu.tools import dispatch, openai_tools
@@ -57,6 +58,10 @@ def _system_prompt(db: Session) -> str:
         nb.nombre
         for nb in db.execute(select(Notebook).order_by(Notebook.nombre)).scalars()
     ]
+    portafolios = [
+        pf.nombre
+        for pf in db.execute(select(Portfolio).order_by(Portfolio.nombre)).scalars()
+    ]
     return (
         "Eres Puiky, un asistente personal (un 'segundo cerebro'). Interpretas lo "
         "que dice el usuario y usas las herramientas para actuar.\n"
@@ -70,6 +75,7 @@ def _system_prompt(db: Session) -> str:
         f"- Categorías: {', '.join(categorias) or '(ninguna)'}. Mapea expresiones "
         "libres ('mercado', 'súper') a la más adecuada; si ninguna aplica, 'Otros'.\n"
         f"- Cuentas: {', '.join(cuentas) or '(ninguna)'}. Úsalas sin preguntar.\n"
+        f"- Portafolios: {', '.join(portafolios) or '(ninguno)'} (agrupan proyectos).\n"
         f"- Proyectos activos: {', '.join(proyectos) or '(ninguno)'}.\n"
         "- Pide un dato solo si de verdad falta; no preguntes por algo ya dicho.\n"
         "- Puedes ejecutar varias acciones si el usuario menciona varias.\n"
