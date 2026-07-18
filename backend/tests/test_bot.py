@@ -1,20 +1,41 @@
-"""Tests del bot que no requieren Telegram vivo: allowlist y parseo de IDs."""
+"""Tests del bot que no requieren Telegram vivo ni BD.
 
-from app.bot.handlers import esta_autorizado
-from app.config import Settings
+La autorización pasó de allowlist en .env a la tabla `telegram_link` (resolución
+por BD, se prueba en integración). Aquí se cubre lo unitario: que las llamadas a
+la API lleven el inquilino (`X-Tenant-User`) y el parseo de confirmaciones.
+"""
 
-
-def test_allowlist_decision() -> None:
-    assert esta_autorizado(123, {123, 456})
-    assert not esta_autorizado(999, {123})
-    assert not esta_autorizado(None, {123})
-    # Allowlist vacía = nadie autorizado (seguro por defecto).
-    assert not esta_autorizado(123, set())
+from app.bot.client import PuikyClient
+from app.bot.handlers import _confirmaciones
 
 
-def test_parseo_allowed_ids() -> None:
-    s = Settings(telegram_allowed_ids="123, 456 ,abc,")
-    assert s.allowed_ids == {123, 456}
+def test_headers_incluyen_tenant() -> None:
+    c = PuikyClient("http://x", "tok-servicio")
+    h = c._hdr("user-123")
+    assert h["Authorization"] == "Bearer tok-servicio"
+    assert h["X-Tenant-User"] == "user-123"
 
-    vacia = Settings(telegram_allowed_ids="")
-    assert vacia.allowed_ids == set()
+
+def test_headers_sin_tenant() -> None:
+    c = PuikyClient("http://x", "tok-servicio")
+    h = c._hdr(None)
+    assert h["Authorization"] == "Bearer tok-servicio"
+    assert "X-Tenant-User" not in h
+
+
+def test_confirmaciones_extrae_borrados() -> None:
+    res = {
+        "acciones": [
+            {"resultado": {"confirmar": {"tipo": "note", "id": "1", "que": "la nota X"}}},
+            {"resultado": {"ok": True}},
+        ]
+    }
+    confs = _confirmaciones(res)
+    assert len(confs) == 1
+    assert confs[0]["tipo"] == "note"
+    assert confs[0]["que"] == "la nota X"
+
+
+def test_confirmaciones_vacio() -> None:
+    assert _confirmaciones({"acciones": []}) == []
+    assert _confirmaciones({}) == []
