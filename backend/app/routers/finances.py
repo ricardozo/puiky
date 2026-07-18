@@ -8,7 +8,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -135,6 +135,38 @@ def listar_movimientos(
         category_id,
         desde,
         hasta,
+    )
+
+
+_XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+@transactions_router.get("/export.xlsx")
+def exportar_movimientos(
+    account_id: uuid.UUID | None = Query(default=None),
+    tipo: TransactionTipo | None = Query(default=None),
+    category_id: uuid.UUID | None = Query(default=None),
+    desde: date | None = Query(default=None),
+    hasta: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Exporta los movimientos filtrados a un archivo Excel (.xlsx).
+
+    Acepta los mismos filtros que el listado; al filtrar por cuenta incluye las
+    transferencias en ambos sentidos, para que coincida con la vista de la web."""
+    contenido = service.export_transactions_xlsx(
+        db,
+        account_id,
+        tipo.value if tipo is not None else None,
+        category_id,
+        desde,
+        hasta,
+    )
+    nombre = f"puiky-finanzas-{date.today():%Y-%m-%d}.xlsx"
+    return Response(
+        content=contenido,
+        media_type=_XLSX_MIME,
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
     )
 
 

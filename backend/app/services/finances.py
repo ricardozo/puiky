@@ -14,8 +14,9 @@ import calendar
 import uuid
 from datetime import date
 from decimal import Decimal
+from io import BytesIO
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.finances import Account, Budget, Category, Transaction
@@ -312,3 +313,167 @@ def budget_progress(
     inicio, fin = _rango_mes(anio, mes)
     gastado = _gasto_del_mes(db, budget.category_id, inicio, fin)
     return budget, gastado
+
+
+# --- Exportación a Excel ---
+
+_MONEY_FMT = '"$"#,##0'
+_DATE_FMT = "yyyy-mm-dd"
+_HEADER_COLOR = "2F6F6D"  # teal de la marca
+
+
+def _tx_export_query(
+    db: Session,
+    account_id: uuid.UUID | None,
+    tipo: str | None,
+    category_id: uuid.UUID | None,
+    desde: date | None,
+    hasta: date | None,
+) -> list[Transaction]:
+    """Como list_transactions, pero al filtrar por cuenta incluye las
+    transferencias donde la cuenta es origen O destino (para que el libro
+    coincida con el detalle de cuenta de la web)."""
+    stmt = select(Transaction)
+    if account_id is not None:
+        stmt = stmt.where(
+            or_(
+                Transaction.account_id == account_id,
+                Transaction.cuenta_destino_id == account_id,
+            )
+        )
+    if tipo is not None:
+        stmt = stmt.where(Transaction.tipo == tipo)
+    if category_id is not None:
+        stmt = stmt.where(Transaction.category_id == category_id)
+    if desde is not None:
+        stmt = stmt.where(Transaction.fecha >= desde)
+    if hasta is not None:
+        stmt = stmt.where(Transaction.fecha <= hasta)
+    return list(db.execute(stmt.order_by(Transaction.fecha.desc())).scalars().all())
+
+
+def export_transactions_xlsx(
+    db: Session,
+    account_id: uuid.UUID | None = None,
+    tipo: str | None = None,
+    category_id: uuid.UUID | None = None,
+    desde: date | None = None,
+    hasta: date | None = None,
+) -> bytes:
+    """Arma un .xlsx con los movimientos filtrados (hoja Movimientos) y sus
+    totales (hoja Resumen). Devuelve los bytes del libro."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    txs = _tx_export_query(db, account_id, tipo, category_id, desde, hasta)
+    cuentas = {a.id: a.nombre for a in list_accounts(db)}
+    categorias = {c.id: c.nombre for c in list_categories(db)}
+
+    def nom_cuenta(cid: uuid.UUID | None) -> str:
+        return cuentas.get(cid, "—") if cid else ""
+
+    def nom_categoria(cid: uuid.UUID | None) -> str:
+        return categorias.get(cid, "—") if cid else "(sin categoría)"
+
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor=_HEADER_COLOR)
+    bold = Font(bold=True)
+
+    wb = Workbook()
+
+    # --- Hoja Movimientos ---
+    ws = wb.active
+    ws.title = "Movimientos"
+    encabezados = ["Fecha", "Tipo", "Monto", "Cuenta", "Cuenta destino", "Categoría", "Nota"]
+    ws.append(encabezados)
+    for col in range(1, len(encabezados) + 1):
+        celda = ws.cell(row=1, column=col)
+        celda.font = header_font
+        celda.fill = header_fill
+    for t in txs:
+        ws.append([
+            t.fecha,
+            t.tipo,
+            float(t.monto),
+            nom_cuenta(t.account_id),
+            nom_cuenta(t.cuenta_destino_id) if t.tipo == TRANSFERENCIA else "",
+            nom_categoria(t.category_id) if t.tipo != TRANSFERENCIA else "",
+            t.nota or "",
+        ])
+    for fila in ws.iter_rows(min_row=2, min_col=1, max_col=1):
+        fila[0].number_format = _DATE_FMT
+    for fila in ws.iter_rows(min_row=2, min_col=3, max_col=3):
+        fila[0].number_format = _MONEY_FMT
+    for i, ancho in enumerate([12, 14, 14, 16, 16, 18, 40], start=1):
+        ws.column_dimensions[get_column_letter(i)].width = ancho
+    ws.freeze_panes = "A2"
+
+    # --- Hoja Resumen ---
+    rs = wb.create_sheet("Resumen")
+    ingresos = sum((t.monto for t in txs if t.tipo == INGRESO), Decimal("0"))
+    gastos = sum((t.monto for t in txs if t.tipo == GASTO), Decimal("0"))
+
+    def money(celda: str, valor: Decimal, negrita: bool = False) -> None:
+        rs[celda] = float(valor)
+        rs[celda].number_format = _MONEY_FMT
+        if negrita:
+            rs[celda].font = bold
+
+    rs["A1"] = "Resumen de finanzas"
+    rs["A1"].font = bold
+    rs["A2"] = "Período"
+    rs["B2"] = f"{desde or '—'} a {hasta or 'hoy'}"
+    rs["A3"] = "Ingresos"; money("B3", ingresos)
+    rs["A4"] = "Gastos"; money("B4", gastos)
+    rs["A5"] = "Diferencia"; rs["A5"].font = bold; money("B5", ingresos - gastos, negrita=True)
+
+    def encabezar(fila: int, titulos: list[str]) -> None:
+        for col, txt in zip("ABCD", titulos):
+            rs[f"{col}{fila}"] = txt
+            rs[f"{col}{fila}"].font = bold
+
+    # Por categoría
+    fila = 7
+    rs[f"A{fila}"] = "Por categoría"; rs[f"A{fila}"].font = bold
+    fila += 1
+    encabezar(fila, ["Categoría", "Ingresos", "Gastos", "Neto"])
+    fila += 1
+    por_cat: dict[str, list[Decimal]] = {}
+    for t in txs:
+        if t.tipo not in (GASTO, INGRESO):
+            continue
+        acc = por_cat.setdefault(nom_categoria(t.category_id), [Decimal("0"), Decimal("0")])
+        acc[0 if t.tipo == INGRESO else 1] += t.monto
+    for nom, (ing, gas) in sorted(por_cat.items(), key=lambda kv: abs(kv[1][0] - kv[1][1]), reverse=True):
+        rs[f"A{fila}"] = nom
+        money(f"B{fila}", ing); money(f"C{fila}", gas); money(f"D{fila}", ing - gas)
+        fila += 1
+
+    # Por cuenta (entradas/salidas/neto, incluyendo transferencias)
+    fila += 1
+    rs[f"A{fila}"] = "Por cuenta"; rs[f"A{fila}"].font = bold
+    fila += 1
+    encabezar(fila, ["Cuenta", "Entradas", "Salidas", "Neto"])
+    fila += 1
+    por_cuenta: dict[str, list[Decimal]] = {}
+    for t in txs:
+        origen = por_cuenta.setdefault(nom_cuenta(t.account_id), [Decimal("0"), Decimal("0")])
+        if t.tipo == INGRESO:
+            origen[0] += t.monto
+        else:  # gasto o transferencia: sale de la cuenta origen
+            origen[1] += t.monto
+        if t.tipo == TRANSFERENCIA and t.cuenta_destino_id:
+            destino = por_cuenta.setdefault(nom_cuenta(t.cuenta_destino_id), [Decimal("0"), Decimal("0")])
+            destino[0] += t.monto  # entra a la cuenta destino
+    for nom, (ent, sal) in sorted(por_cuenta.items()):
+        rs[f"A{fila}"] = nom
+        money(f"B{fila}", ent); money(f"C{fila}", sal); money(f"D{fila}", ent - sal)
+        fila += 1
+
+    for col, ancho in zip("ABCD", [22, 14, 14, 14]):
+        rs.column_dimensions[col].width = ancho
+
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()

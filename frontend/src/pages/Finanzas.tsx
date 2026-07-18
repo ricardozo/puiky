@@ -2,12 +2,39 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import {
   api,
   ApiError,
+  exportFinanzasExcel,
   fmtMoney,
   type Account,
   type BudgetProgress,
   type Category,
   type Transaction,
 } from '../api'
+
+type ExportFiltro = {
+  accountId?: string
+  categoryId?: string
+  desde?: string
+  hasta?: string
+}
+
+function BotonExcel({ filtro, label = 'Exportar a Excel' }: { filtro?: ExportFiltro; label?: string }) {
+  const [busy, setBusy] = useState(false)
+  const bajar = async () => {
+    setBusy(true)
+    try {
+      await exportFinanzasExcel(filtro)
+    } catch {
+      alert('No se pudo exportar el Excel.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <button onClick={bajar} disabled={busy} className="btn-gold btn text-sm py-1.5">
+      {busy ? 'Generando…' : `⬇ ${label}`}
+    </button>
+  )
+}
 
 type Vista =
   | { tipo: 'panel' }
@@ -80,6 +107,7 @@ export default function Finanzas() {
         titulo={acc.nombre}
         subtitulo={acc.tipo}
         saldoActual={acc.saldo}
+        exportBase={{ accountId: acc.id }}
         onVolver={volver}
         fetchTxs={(desde, hasta) => api.listTransactions({ desde, hasta })}
         clasificar={(tx) => {
@@ -106,6 +134,7 @@ export default function Finanzas() {
       <DetalleLibro
         titulo={cat.nombre}
         subtitulo="categoría"
+        exportBase={{ categoryId: cat.id }}
         onVolver={volver}
         fetchTxs={(desde, hasta) =>
           api.listTransactions({ categoryId: cat.id, desde, hasta })
@@ -125,7 +154,10 @@ export default function Finanzas() {
 
   return (
     <div className="space-y-9 max-w-4xl">
-      <h2 className="font-serif text-2xl">Finanzas</h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-serif text-2xl">Finanzas</h2>
+        <BotonExcel />
+      </div>
 
       <Cuentas
         accounts={accounts}
@@ -569,6 +601,7 @@ function DetalleLibro({
   titulo,
   subtitulo,
   saldoActual,
+  exportBase,
   onVolver,
   fetchTxs,
   clasificar,
@@ -576,6 +609,7 @@ function DetalleLibro({
   titulo: string
   subtitulo: string
   saldoActual?: string
+  exportBase?: { accountId?: string; categoryId?: string }
   onVolver: () => void
   fetchTxs: (desde: string, hasta: string) => Promise<Transaction[]>
   clasificar: (tx: Transaction) => Clasificacion | null
@@ -687,6 +721,9 @@ function DetalleLibro({
             }}
           />
           <Preset label="Todo" onClick={() => preset('', '')} />
+        </div>
+        <div className="ml-auto">
+          <BotonExcel filtro={{ ...exportBase, desde, hasta }} label="Excel" />
         </div>
       </div>
 

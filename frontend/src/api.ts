@@ -395,6 +395,43 @@ export const api = {
     request<void>(`/responsibilities/${id}`, { method: 'DELETE' }),
 }
 
+// Descarga el Excel de finanzas (respeta los mismos filtros que el listado).
+// Va aparte de `request` porque devuelve un archivo binario, no JSON, y
+// necesita adjuntar el JWT a mano para poder disparar la descarga.
+export async function exportFinanzasExcel(filtro?: {
+  accountId?: string
+  categoryId?: string
+  tipo?: string
+  desde?: string
+  hasta?: string
+}): Promise<void> {
+  const p = new URLSearchParams()
+  if (filtro?.accountId) p.set('account_id', filtro.accountId)
+  if (filtro?.categoryId) p.set('category_id', filtro.categoryId)
+  if (filtro?.tipo) p.set('tipo', filtro.tipo)
+  if (filtro?.desde) p.set('desde', filtro.desde)
+  if (filtro?.hasta) p.set('hasta', filtro.hasta)
+  const q = p.toString()
+
+  const token = getToken()
+  const res = await fetch(`${BASE}/transactions/export.xlsx${q ? `?${q}` : ''}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) throw new ApiError(res.status, 'No se pudo exportar')
+
+  const blob = await res.blob()
+  const cd = res.headers.get('Content-Disposition')
+  const m = cd && /filename="?([^"]+)"?/.exec(cd)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = m ? m[1] : 'puiky-finanzas.xlsx'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 export function fmtMoney(v: string | number): string {
   return Number(v).toLocaleString('es-CO', { maximumFractionDigits: 0 })
 }
