@@ -1,0 +1,102 @@
+# Puiky — despliegue de PRODUCCIÓN (servidor Ubuntu).
+#
+# Una instancia = un stack aislado. Se levanta con nombre de proyecto propio
+# para que volúmenes y red no se crucen entre personas:
+#
+#   docker compose -p puiky-<nombre> -f docker-compose.prod.yml up -d --build
+#
+# Diferencias con docker-compose.yml (desarrollo):
+#   - Imagen horneada (sin montar el código, sin --reload).
+#   - Postgres NO se expone al host (solo visible en la red interna).
+#   - Migraciones automáticas (servicio one-shot `migrate`).
+#   - Servicio `web` (nginx: SPA + proxy /api) publicado solo en loopback,
+#     para que Cloudflare Tunnel lo enrute.
+#   - restart: unless-stopped en los servicios vivos.
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      TZ: ${TIMEZONE:-America/Bogota}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Sin `ports`: la BD no se expone fuera de la red del stack.
+
+  # One-shot: aplica migraciones y termina. La app espera a que complete.
+  migrate:
+    build: ./backend
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      TZ: ${TIMEZONE:-America/Bogota}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+
+  app:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      TZ: ${TIMEZONE:-America/Bogota}
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - hf_cache:/root/.cache/huggingface
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    # Sin `ports`: solo la alcanza nginx por la red interna.
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: /api
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      # Solo loopback: Cloudflare Tunnel (en el host) enruta a este puerto.
+      - "127.0.0.1:${WEB_PORT:-8080}:80"
+
+  bot:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PUIKY_API_URL: http://app:8000
+      TZ: ${TIMEZONE:-America/Bogota}
+    depends_on:
+      - app
+    volumes:
+      - hf_cache:/root/.cache/huggingface
+    command: ["python", "-m", "app.bot.main"]
+
+  scheduler:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      TZ: ${TIMEZONE:-America/Bogota}
+    depends_on:
+      - app
+    command: ["python", "-m", "app.scheduler.main"]
+
+volumes:
+  pg_data:
+  hf_cache:
