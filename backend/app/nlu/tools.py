@@ -273,18 +273,19 @@ def _completar_tarea(db: Session, a: dict) -> dict:
 
 
 def _listar_tareas_pendientes(db: Session, a: dict) -> dict:
-    tareas = task_svc.list_pendientes(db)
     return {
         "ok": True,
-        "tareas": [
-            {"titulo": t.titulo, "estado": t.estado, "avance_pct": t.avance_pct}
-            for t in tareas
-        ],
+        "tareas": [_resumen_tarea(t) for t in task_svc.list_pendientes(db)],
     }
 
 
 def _resumen_tarea(t: Task) -> dict:
-    return {"titulo": t.titulo, "estado": t.estado, "avance_pct": t.avance_pct}
+    return {
+        "titulo": t.titulo,
+        "proyecto": t.proyecto,
+        "estado": t.estado,
+        "avance_pct": t.avance_pct,
+    }
 
 
 _FECHAS_TAREA = [

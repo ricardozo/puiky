@@ -86,6 +86,7 @@ export interface ChecklistItem {
 export interface Task {
   id: string
   project_id: string | null
+  proyecto: string | null
   titulo: string
   descripcion: string | null
   notas: string | null
@@ -237,6 +238,8 @@ export const api = {
     return request<Project[]>(`/projects${q}`)
   },
   getProject: (id: string) => request<ProjectDetail>(`/projects/${id}`),
+  listTasks: (q?: string) =>
+    request<Task[]>(`/tasks${q ? `?q=${encodeURIComponent(q)}` : ''}`),
   createProject: (nombre: string, portfolioId?: string | null) =>
     request<Project>('/projects', {
       method: 'POST',

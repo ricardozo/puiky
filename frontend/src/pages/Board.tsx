@@ -224,7 +224,7 @@ function Fecha({
   )
 }
 
-function TaskEditor({
+export function TaskEditor({
   taskInicial,
   onClose,
 }: {

@@ -56,11 +56,12 @@ def crear_tarea(data: TaskCreate, db: Session = Depends(get_db)) -> TaskOut:
 def listar_tareas(
     project_id: uuid.UUID | None = Query(default=None),
     estado: TaskEstado | None = Query(default=None),
+    q: str | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> list[TaskOut]:
-    """Lista tareas, con filtros opcionales por proyecto y estado."""
+    """Lista tareas (por vencimiento), con filtros por proyecto, estado y texto."""
     valor_estado = estado.value if estado is not None else None
-    return service.list_tasks(db, project_id, valor_estado)
+    return service.list_tasks(db, project_id, valor_estado, q)
 
 
 # Rutas estáticas antes de /{task_id} para que no las capture el path param.

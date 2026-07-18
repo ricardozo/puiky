@@ -39,7 +39,10 @@ def get_project(db: Session, project_id: uuid.UUID) -> Project | None:
     """Proyecto con sus tareas cargadas (las notas las agrega el router)."""
     stmt = (
         select(Project)
-        .options(selectinload(Project.tasks).selectinload(Task.checklist))
+        .options(
+            selectinload(Project.tasks).selectinload(Task.checklist),
+            selectinload(Project.tasks).selectinload(Task.project),
+        )
         .where(Project.id == project_id)
     )
     return db.execute(stmt).scalar_one_or_none()

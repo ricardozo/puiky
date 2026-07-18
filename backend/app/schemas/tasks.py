@@ -76,6 +76,7 @@ class TaskOut(BaseModel):
 
     id: uuid.UUID
     project_id: uuid.UUID | None
+    proyecto: str | None  # nombre del proyecto (o null si no tiene)
     titulo: str
     descripcion: str | None
     notas: str | None

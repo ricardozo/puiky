@@ -8,7 +8,7 @@ import Board from './pages/Board'
 import Finanzas from './pages/Finanzas'
 import Recordatorios from './pages/Recordatorios'
 import Responsabilidades from './pages/Responsabilidades'
-import Placeholder from './pages/Placeholder'
+import Tareas from './pages/Tareas'
 
 export default function App() {
   const { usuario, loading } = useAuth()
@@ -29,7 +29,7 @@ export default function App() {
         <Route path="notas" element={<Notes />} />
         <Route path="proyectos" element={<Projects />} />
         <Route path="proyectos/:id" element={<Board />} />
-        <Route path="tareas" element={<Placeholder titulo="Tareas" />} />
+        <Route path="tareas" element={<Tareas />} />
         <Route path="finanzas" element={<Finanzas />} />
         <Route path="responsabilidades" element={<Responsabilidades />} />
         <Route path="recordatorios" element={<Recordatorios />} />

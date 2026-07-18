@@ -27,7 +27,9 @@ def _validar_proyecto(db: Session, project_id: uuid.UUID | None) -> None:
 
 
 def _con_checklist(stmt):
-    return stmt.options(selectinload(Task.checklist))
+    return stmt.options(
+        selectinload(Task.checklist), selectinload(Task.project)
+    )
 
 
 def _aplicar_progreso_checklist(task: Task) -> None:
@@ -74,12 +76,17 @@ def list_tasks(
     db: Session,
     project_id: uuid.UUID | None = None,
     estado: str | None = None,
+    q: str | None = None,
 ) -> list[Task]:
+    """Lista tareas ordenadas por vencimiento (las sin fecha, al final). Filtra
+    por proyecto, estado y/o texto en el título (`q`)."""
     stmt = select(Task)
     if project_id is not None:
         stmt = stmt.where(Task.project_id == project_id)
     if estado is not None:
         stmt = stmt.where(Task.estado == estado)
+    if q:
+        stmt = stmt.where(Task.titulo.ilike(f"%{q}%"))
     stmt = stmt.order_by(Task.fecha_limite.is_(None), Task.fecha_limite)
     return list(db.execute(_con_checklist(stmt)).scalars().all())
 

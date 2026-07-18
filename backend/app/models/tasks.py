@@ -63,6 +63,11 @@ class Task(Base):
         order_by="ChecklistItem.orden",
     )
 
+    @property
+    def proyecto(self) -> str | None:
+        """Nombre del proyecto (para exponerlo en los listados)."""
+        return self.project.nombre if self.project else None
+
 
 class ChecklistItem(Base):
     """Ítem marcable de una tarea. Su proporción marcada da el % de avance."""
