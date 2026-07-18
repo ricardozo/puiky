@@ -58,6 +58,9 @@ services:
         condition: service_completed_successfully
     volumes:
       - hf_cache:/root/.cache/huggingface
+    # Permite alcanzar Ollama (que corre en el host) vía host.docker.internal.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     # Sin `ports`: solo la alcanza nginx por la red interna.
 
