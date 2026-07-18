@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, type Note, type Notebook, type SearchResult } from '../api'
 
-const inputCls =
-  'rounded-lg bg-slate-900 border border-slate-700 px-4 py-2.5 outline-none focus:border-indigo-500'
-
 type Seleccion =
   | { tipo: 'home' }
   | { tipo: 'todas' }
@@ -110,18 +107,16 @@ function Home({
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold">Notas</h2>
+      <h2 className="font-serif text-2xl">Notas</h2>
 
       <form onSubmit={buscar} className="flex gap-2">
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Búsqueda semántica en todos los cuadernos…"
-          className={`${inputCls} flex-1`}
+          className="input flex-1"
         />
-        <button className="rounded-lg border border-slate-700 px-4 hover:bg-slate-800">
-          Buscar
-        </button>
+        <button className="btn-ghost btn">Buscar</button>
         {resultados && (
           <button
             type="button"
@@ -129,7 +124,7 @@ function Home({
               setResultados(null)
               setQuery('')
             }}
-            className="rounded-lg border border-slate-700 px-4 hover:bg-slate-800"
+            className="btn-ghost btn"
           >
             Limpiar
           </button>
@@ -138,21 +133,21 @@ function Home({
 
       {resultados ? (
         <div className="space-y-2">
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-muted">
             {resultados.length} resultado(s) por significado
           </p>
           {resultados.map((n) => (
             <button
               key={n.id}
               onClick={() => onAbrirNota(n)}
-              className="block w-full text-left rounded-lg border border-slate-800 bg-slate-900/50 px-4 py-3 hover:border-slate-600 transition"
+              className="card block w-full text-left px-4 py-3 hover:border-teal transition"
             >
               <div className="font-medium">{tituloTarjeta(n)}</div>
-              <div className="text-sm text-slate-400 mt-0.5 line-clamp-2">
+              <div className="text-sm text-muted mt-0.5 line-clamp-2">
                 {cuerpoTarjeta(n)}
               </div>
-              <div className="text-xs text-slate-500 mt-1">
-                <span className="text-indigo-400">
+              <div className="text-xs text-faint mt-1.5">
+                <span className="text-brand font-medium">
                   {(n.similitud * 100).toFixed(0)}% afín
                 </span>
                 {nombreCuaderno(n.notebook_id) && (
@@ -171,11 +166,11 @@ function Home({
               <button
                 key={nb.id}
                 onClick={() => onAbrir({ tipo: 'cuaderno', nb })}
-                className="text-left rounded-xl border border-slate-800 bg-slate-900/50 p-4 hover:border-slate-600 transition"
+                className="card text-left p-4 hover:border-teal transition"
               >
                 <div className="text-2xl">📓</div>
                 <div className="font-medium mt-2">{nb.nombre}</div>
-                <div className="text-xs text-slate-500 mt-1">
+                <div className="text-xs text-faint mt-1">
                   {nb.notas} nota{nb.notas === 1 ? '' : 's'}
                 </div>
               </button>
@@ -187,11 +182,9 @@ function Home({
               value={nuevoNb}
               onChange={(e) => setNuevoNb(e.target.value)}
               placeholder="Nuevo cuaderno…"
-              className={`${inputCls} flex-1`}
+              className="input flex-1"
             />
-            <button className="rounded-lg bg-indigo-600 hover:bg-indigo-500 px-4 font-medium">
-              Crear
-            </button>
+            <button className="btn">Crear</button>
           </form>
         </>
       )}
@@ -203,7 +196,7 @@ function SpecialCard({ titulo, onClick }: { titulo: string; onClick: () => void 
   return (
     <button
       onClick={onClick}
-      className="text-left rounded-xl border border-slate-800 bg-slate-800/40 p-4 hover:border-slate-600 transition"
+      className="text-left rounded-[14px] border border-line bg-surface-2 p-4 hover:border-teal transition"
     >
       <div className="text-2xl">🗂️</div>
       <div className="font-medium mt-2">{titulo}</div>
@@ -253,36 +246,33 @@ function Detalle({
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={onVolver} className="text-slate-400 hover:text-slate-200 text-sm">
+          <button onClick={onVolver} className="text-muted hover:text-ink text-sm">
             ← Cuadernos
           </button>
-          <h2 className="text-xl font-semibold">📓 {titulo}</h2>
+          <h2 className="font-serif text-2xl">📓 {titulo}</h2>
         </div>
-        <button
-          onClick={() => onNueva(nbId)}
-          className="rounded-lg bg-indigo-600 hover:bg-indigo-500 px-4 py-2 font-medium text-sm"
-        >
+        <button onClick={() => onNueva(nbId)} className="btn text-sm">
           + Nueva hoja
         </button>
       </div>
 
       {cargando ? (
-        <p className="text-slate-500">Cargando…</p>
+        <p className="text-faint">Cargando…</p>
       ) : notas.length === 0 ? (
-        <p className="text-slate-500">Sin hojas aquí. Crea la primera.</p>
+        <p className="text-faint">Sin hojas aquí. Crea la primera.</p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {notas.map((n) => (
             <button
               key={n.id}
               onClick={() => onAbrirNota(n)}
-              className="text-left rounded-xl border border-slate-800 bg-slate-900/50 p-4 hover:border-slate-600 transition"
+              className="card text-left p-4 hover:border-teal transition"
             >
               <div className="font-medium">{tituloTarjeta(n)}</div>
-              <div className="text-sm text-slate-400 mt-1 line-clamp-3 whitespace-pre-wrap">
+              <div className="text-sm text-muted mt-1 line-clamp-3 whitespace-pre-wrap">
                 {cuerpoTarjeta(n)}
               </div>
-              <div className="text-xs text-slate-500 mt-2">
+              <div className="text-xs text-faint mt-2">
                 {new Date(n.actualizada).toLocaleDateString('es-CO')}
                 {sel.tipo === 'todas' && nombreCuaderno(n.notebook_id) && (
                   <span className="ml-2">· 📓 {nombreCuaderno(n.notebook_id)}</span>
@@ -342,7 +332,7 @@ function HojaEditor({
 
   return (
     <div className="space-y-4 max-w-3xl">
-      <button onClick={onVolver} className="text-slate-400 hover:text-slate-200 text-sm">
+      <button onClick={onVolver} className="text-muted hover:text-ink text-sm">
         ← Volver
       </button>
 
@@ -350,7 +340,7 @@ function HojaEditor({
         value={titulo}
         onChange={(e) => setTitulo(e.target.value)}
         placeholder="Título (opcional)"
-        className="w-full bg-transparent text-2xl font-semibold outline-none placeholder:text-slate-600"
+        className="w-full bg-transparent font-serif text-3xl outline-none placeholder:text-faint"
       />
 
       <textarea
@@ -358,23 +348,19 @@ function HojaEditor({
         onChange={(e) => setCuerpo(e.target.value)}
         rows={16}
         placeholder="Escribe aquí…"
-        className="w-full rounded-lg bg-slate-900 border border-slate-700 px-4 py-3 outline-none focus:border-indigo-500 whitespace-pre-wrap"
+        className="input whitespace-pre-wrap"
       />
 
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          onClick={guardar}
-          disabled={guardando}
-          className="rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 px-5 py-2 font-medium"
-        >
+        <button onClick={guardar} disabled={guardando} className="btn px-5">
           {guardando ? 'Guardando…' : 'Guardar'}
         </button>
-        <label className="text-sm text-slate-400 flex items-center gap-2">
+        <label className="text-sm text-muted flex items-center gap-2">
           Cuaderno:
           <select
             value={notebookId}
             onChange={(e) => setNotebookId(e.target.value)}
-            className="rounded-lg bg-slate-900 border border-slate-700 px-2 py-1.5 outline-none focus:border-indigo-500"
+            className="input py-1.5 w-auto"
           >
             <option value="">— sin cuaderno —</option>
             {notebooks.map((nb) => (
@@ -386,12 +372,12 @@ function HojaEditor({
         </label>
         {nota && (
           <>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-faint">
               actualizada {new Date(nota.actualizada).toLocaleString('es-CO')}
             </span>
             <button
               onClick={eliminar}
-              className="ml-auto text-slate-500 hover:text-red-400 text-sm"
+              className="ml-auto text-faint hover:text-[color:var(--c-danger)] text-sm"
             >
               Eliminar
             </button>

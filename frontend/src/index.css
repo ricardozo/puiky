@@ -1,1 +1,145 @@
 @import 'tailwindcss';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/fraunces';
+
+/*
+  Sistema de diseño Puiky — Manual de Identidad Visual.
+  Paleta: Guatavita / altiplano andino. Oro muisca como acento.
+  Colores crudos de la marca:
+    Agua profunda #0F3D3E · Lago tranquilo #2F6F6D · Verde andino #68B37B
+    Oro muisca #C8A040 · Arena clara #E9E2CE
+*/
+
+:root {
+  /* --- Tokens semánticos · tema CLARO (por defecto) --- */
+  --c-ground: #ece5d3; /* fondo (arena) */
+  --c-surface: #fbf8ef; /* tarjetas */
+  --c-surface-2: #f3ecda; /* superficies suaves / sidebar */
+  --c-ink: #123330; /* texto principal (agua profunda) */
+  --c-muted: #6a7a72; /* texto secundario */
+  --c-faint: #97a099; /* texto terciario */
+  --c-line: #e0d7c1; /* bordes */
+  --c-brand: #a87f1e; /* oro (legible sobre claro) */
+  --c-brand-soft: rgba(200, 160, 64, 0.16);
+  --c-primary: #2f6f6d; /* teal (acción principal) */
+  --c-primary-ink: #ffffff;
+  --c-teal: #2f6f6d;
+  --c-green: #3f915f; /* verde andino (positivo) */
+  --c-danger: #b0503f;
+  --shadow: 0 1px 2px rgba(15, 61, 62, 0.05), 0 10px 26px -14px rgba(15, 61, 62, 0.18);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --c-ground: #0b2523;
+    --c-surface: #103430;
+    --c-surface-2: #0d2c29;
+    --c-ink: #eef3ec;
+    --c-muted: #9cb4ac;
+    --c-faint: #6f8a82;
+    --c-line: #1e433e;
+    --c-brand: #d8b45a;
+    --c-brand-soft: rgba(216, 180, 90, 0.16);
+    --c-primary: #3f8f89;
+    --c-primary-ink: #04211d;
+    --c-teal: #5fb0a7;
+    --c-green: #68b37b;
+    --c-danger: #e08a7a;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 14px 34px -16px rgba(0, 0, 0, 0.6);
+  }
+}
+
+:root[data-theme='light'] {
+  --c-ground: #ece5d3; --c-surface: #fbf8ef; --c-surface-2: #f3ecda;
+  --c-ink: #123330; --c-muted: #6a7a72; --c-faint: #97a099; --c-line: #e0d7c1;
+  --c-brand: #a87f1e; --c-brand-soft: rgba(200, 160, 64, 0.16);
+  --c-primary: #2f6f6d; --c-primary-ink: #ffffff; --c-teal: #2f6f6d;
+  --c-green: #3f915f; --c-danger: #b0503f;
+  --shadow: 0 1px 2px rgba(15, 61, 62, 0.05), 0 10px 26px -14px rgba(15, 61, 62, 0.18);
+}
+:root[data-theme='dark'] {
+  --c-ground: #0b2523; --c-surface: #103430; --c-surface-2: #0d2c29;
+  --c-ink: #eef3ec; --c-muted: #9cb4ac; --c-faint: #6f8a82; --c-line: #1e433e;
+  --c-brand: #d8b45a; --c-brand-soft: rgba(216, 180, 90, 0.16);
+  --c-primary: #3f8f89; --c-primary-ink: #04211d; --c-teal: #5fb0a7;
+  --c-green: #68b37b; --c-danger: #e08a7a;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 14px 34px -16px rgba(0, 0, 0, 0.6);
+}
+
+/* Mapea los tokens a la paleta de Tailwind (utilidades bg-surface, text-ink, …) */
+@theme inline {
+  --color-ground: var(--c-ground);
+  --color-surface: var(--c-surface);
+  --color-surface-2: var(--c-surface-2);
+  --color-ink: var(--c-ink);
+  --color-muted: var(--c-muted);
+  --color-faint: var(--c-faint);
+  --color-line: var(--c-line);
+  --color-brand: var(--c-brand);
+  --color-primary: var(--c-primary);
+  --color-teal: var(--c-teal);
+  --color-green: var(--c-green);
+  --color-danger: var(--c-danger);
+  --font-sans: 'Inter Variable', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
+}
+
+html { color-scheme: light dark; }
+body {
+  margin: 0;
+  background: var(--c-ground);
+  color: var(--c-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, h4 { font-family: var(--font-serif); font-weight: 600; }
+
+::selection { background: var(--c-brand-soft); }
+:focus-visible { outline: 2px solid var(--c-teal); outline-offset: 2px; }
+
+/* --- Primitivas de componentes --- */
+@layer components {
+  .card {
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+  }
+  .input {
+    width: 100%;
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: 10px;
+    padding: 0.6rem 0.9rem;
+    color: var(--c-ink);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .input::placeholder { color: var(--c-faint); }
+  .input:focus { border-color: var(--c-teal); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+    background: var(--c-primary); color: var(--c-primary-ink);
+    font-weight: 600; border: none; border-radius: 10px;
+    padding: 0.6rem 1.1rem; cursor: pointer; transition: filter 0.15s, opacity 0.15s;
+  }
+  .btn:hover { filter: brightness(1.08); }
+  .btn:disabled { opacity: 0.55; cursor: default; }
+  .btn-ghost {
+    background: transparent; color: var(--c-ink);
+    border: 1px solid var(--c-line);
+  }
+  .btn-ghost:hover { background: var(--c-surface-2); filter: none; }
+  .btn-gold { background: var(--c-brand); color: #1c1408; }
+
+  .badge {
+    display: inline-flex; align-items: center;
+    font-size: 0.72rem; font-weight: 600; padding: 0.1rem 0.55rem;
+    border-radius: 999px; background: var(--c-brand-soft); color: var(--c-brand);
+  }
+  .eyebrow {
+    font-family: var(--font-sans); font-size: 0.7rem; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--c-brand); font-weight: 600;
+  }
+}

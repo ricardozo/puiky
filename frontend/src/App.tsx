@@ -15,7 +15,7 @@ export default function App() {
 
   if (loading)
     return (
-      <div className="min-h-screen grid place-items-center bg-slate-950 text-slate-400">
+      <div className="min-h-screen grid place-items-center bg-ground text-muted">
         Cargando…
       </div>
     )

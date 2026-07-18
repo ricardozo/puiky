@@ -22,13 +22,16 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen grid place-items-center bg-slate-950 text-slate-100 px-4">
-      <form onSubmit={submit} className="w-full max-w-sm space-y-6">
-        <div className="text-center">
-          <h1 className="text-4xl font-semibold tracking-tight">Puiky</h1>
-          <p className="text-slate-400 text-sm mt-2">
-            El corazón y la mente, donde se piensa y se recuerda.
-          </p>
+    <div className="min-h-screen grid place-items-center bg-ground text-ink px-4">
+      <form onSubmit={submit} className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <img
+            src="/logo-simbolo.png"
+            alt="Puiky"
+            className="size-20 rounded-2xl object-cover mx-auto shadow-[var(--shadow)]"
+          />
+          <h1 className="font-serif text-4xl mt-5 tracking-tight">Puiky</h1>
+          <p className="eyebrow mt-2">tu segundo cerebro</p>
         </div>
         <div className="space-y-3">
           <input
@@ -36,21 +39,18 @@ export default function Login() {
             onChange={(e) => setUsuario(e.target.value)}
             placeholder="Usuario"
             autoFocus
-            className="w-full rounded-lg bg-slate-900 border border-slate-700 px-4 py-2.5 outline-none focus:border-indigo-500"
+            className="input"
           />
           <input
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             type="password"
             placeholder="Contraseña"
-            className="w-full rounded-lg bg-slate-900 border border-slate-700 px-4 py-2.5 outline-none focus:border-indigo-500"
+            className="input"
           />
         </div>
-        {error && <p className="text-red-400 text-sm">{error}</p>}
-        <button
-          disabled={busy}
-          className="w-full rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 py-2.5 font-medium transition"
-        >
+        {error && <p className="text-[color:var(--c-danger)] text-sm mt-3">{error}</p>}
+        <button disabled={busy} className="btn w-full mt-5 py-2.5">
           {busy ? 'Entrando…' : 'Iniciar sesión'}
         </button>
       </form>
