@@ -13,15 +13,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# 1) Instalar dependencias primero (capa cacheada mientras no cambie el lock)
+# 1) Instalar dependencias primero (capa cacheada mientras no cambie el lock).
+# Sin `--mount=type=cache` para no depender de BuildKit (portable al builder clásico).
 COPY pyproject.toml uv.lock ./
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-install-project
+RUN uv sync --frozen --no-install-project
 
 # 2) Copiar el código y terminar la instalación
 COPY . .
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen
+RUN uv sync --frozen
 
 # Ejecutar dentro del venv sin escribir "uv run" en cada comando
 ENV PATH="/app/.venv/bin:$PATH"
