@@ -207,11 +207,13 @@ def delete_checklist_item(db: Session, item_id: uuid.UUID) -> Task | None:
     item = db.get(ChecklistItem, item_id)
     if item is None:
         return None
-    task_id = item.task_id
-    db.delete(item)
-    db.flush()
-    task = get_task(db, task_id)
+    task = get_task(db, item.task_id)
     assert task is not None
+    # Quitar de la colección (delete-orphan lo borra) para que el checklist en
+    # memoria quede consistente y el avance se recalcule bien.
+    objetivo = next((i for i in task.checklist if i.id == item_id), None)
+    if objetivo is not None:
+        task.checklist.remove(objetivo)
     _aplicar_progreso_checklist(task)
     db.commit()
     db.refresh(task)
