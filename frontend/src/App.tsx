@@ -9,6 +9,7 @@ import Finanzas from './pages/Finanzas'
 import Recordatorios from './pages/Recordatorios'
 import Responsabilidades from './pages/Responsabilidades'
 import Tareas from './pages/Tareas'
+import Concepto from './pages/Concepto'
 
 export default function App() {
   const { usuario, loading } = useAuth()
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="finanzas" element={<Finanzas />} />
         <Route path="responsabilidades" element={<Responsabilidades />} />
         <Route path="recordatorios" element={<Recordatorios />} />
+        <Route path="concepto" element={<Concepto />} />
         <Route path="*" element={<Navigate to="/notas" replace />} />
       </Route>
     </Routes>

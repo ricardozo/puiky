@@ -138,6 +138,15 @@ h1, h2, h3, h4 { font-family: var(--font-serif); font-weight: 600; }
     font-size: 0.72rem; font-weight: 600; padding: 0.1rem 0.55rem;
     border-radius: 999px; background: var(--c-brand-soft); color: var(--c-brand);
   }
+  /* Píldoras de estado (proyectos, tareas, Kanban) */
+  .pill {
+    display: inline-flex; align-items: center; white-space: nowrap;
+    font-size: 0.72rem; font-weight: 600; padding: 0.1rem 0.55rem; border-radius: 999px;
+  }
+  .pill-active { background: rgba(47, 111, 109, 0.14); color: var(--c-teal); }
+  .pill-ok { background: rgba(63, 145, 95, 0.16); color: var(--c-green); }
+  .pill-warn { background: var(--c-brand-soft); color: var(--c-brand); }
+  .pill-mute { background: var(--c-surface-2); color: var(--c-faint); }
   .eyebrow {
     font-family: var(--font-sans); font-size: 0.7rem; letter-spacing: 0.12em;
     text-transform: uppercase; color: var(--c-brand); font-weight: 600;

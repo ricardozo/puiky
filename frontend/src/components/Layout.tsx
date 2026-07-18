@@ -47,6 +47,22 @@ export default function Layout() {
               {s.label}
             </NavLink>
           ))}
+
+          <div className="pt-2 mt-2 border-t border-line">
+            <NavLink
+              to="/concepto"
+              className={({ isActive }) =>
+                `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition ${
+                  isActive
+                    ? 'bg-[var(--c-brand-soft)] text-brand font-medium'
+                    : 'text-muted hover:bg-surface hover:text-ink'
+                }`
+              }
+            >
+              <span className="text-base">✦</span>
+              ¿Qué es Puiky?
+            </NavLink>
+          </div>
         </nav>
 
         <div className="px-4 py-4 border-t border-line flex items-center gap-2 text-sm">

@@ -1,9 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError, fmtMoney, type Responsibility } from '../api'
 
-const inputCls =
-  'rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 outline-none focus:border-indigo-500'
-
 const RECURRENCIAS = ['diaria', 'semanal', 'mensual', 'trimestral', 'anual']
 
 export default function Responsabilidades() {
@@ -49,19 +46,19 @@ export default function Responsabilidades() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <h2 className="text-xl font-semibold">Responsabilidades</h2>
+      <h2 className="font-serif text-2xl">Responsabilidades</h2>
 
       <form onSubmit={crear} className="flex flex-wrap gap-2">
         <input
           value={nombre}
           onChange={(e) => setNombre(e.target.value)}
           placeholder="Compromiso (arriendo, renovación…)"
-          className={`${inputCls} flex-1 min-w-48`}
+          className="input flex-1 min-w-48"
         />
         <select
           value={recurrencia}
           onChange={(e) => setRecurrencia(e.target.value)}
-          className={inputCls}
+          className="input w-auto"
         >
           {RECURRENCIAS.map((r) => (
             <option key={r} value={r}>
@@ -75,35 +72,33 @@ export default function Responsabilidades() {
           type="date"
           min="2000-01-01"
           max="9999-12-31"
-          className={inputCls}
+          className="input w-auto"
         />
         <input
           value={monto}
           onChange={(e) => setMonto(e.target.value)}
           type="number"
           placeholder="monto (opcional)"
-          className={`${inputCls} w-40`}
+          className="input w-40"
         />
-        <button className="rounded-lg bg-indigo-600 hover:bg-indigo-500 px-4 font-medium">
-          Crear
-        </button>
+        <button className="btn">Crear</button>
       </form>
-      {error && <p className="text-red-400 text-sm">{error}</p>}
+      {error && <p className="text-[color:var(--c-danger)] text-sm">{error}</p>}
 
       {cargando ? (
-        <p className="text-slate-500">Cargando…</p>
+        <p className="text-faint">Cargando…</p>
       ) : items.length === 0 ? (
-        <p className="text-slate-500">Sin responsabilidades.</p>
+        <p className="text-faint">Sin responsabilidades.</p>
       ) : (
         <ul className="space-y-2">
           {items.map((r) => (
             <li
               key={r.id}
-              className="group rounded-lg border border-slate-800 bg-slate-900/50 px-4 py-3 flex items-center justify-between gap-3"
+              className="group card px-4 py-3 flex items-center justify-between gap-3"
             >
               <div>
                 <p className="font-medium">{r.nombre}</p>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-muted mt-1">
                   {r.recurrencia} · próximo:{' '}
                   {new Date(r.proximo_venc + 'T00:00').toLocaleDateString('es-CO')}
                   {r.monto && ` · $${fmtMoney(r.monto)}`}
@@ -115,17 +110,19 @@ export default function Responsabilidades() {
                     await api.fulfillResponsibility(r.id)
                     cargar()
                   }}
-                  className="rounded bg-emerald-600/80 hover:bg-emerald-600 px-2 py-1"
+                  className="btn text-sm py-1"
+                  style={{ background: 'var(--c-green)', color: '#fff' }}
                   title="Marcar cumplida (recalcula el próximo vencimiento)"
                 >
                   Cumplida
                 </button>
                 <button
                   onClick={async () => {
+                    if (!window.confirm('¿Eliminar esta responsabilidad?')) return
                     await api.deleteResponsibility(r.id)
                     cargar()
                   }}
-                  className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition"
+                  className="opacity-0 group-hover:opacity-100 text-faint hover:text-[color:var(--c-danger)] transition"
                 >
                   ✕
                 </button>

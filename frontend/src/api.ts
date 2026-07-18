@@ -316,7 +316,22 @@ export const api = {
     }),
   listCategories: (soloActivas = true) =>
     request<Category[]>(`/categories?solo_activas=${soloActivas}`),
-  listTransactions: () => request<Transaction[]>('/transactions'),
+  listTransactions: (filtro?: {
+    accountId?: string
+    categoryId?: string
+    tipo?: string
+    desde?: string
+    hasta?: string
+  }) => {
+    const p = new URLSearchParams()
+    if (filtro?.accountId) p.set('account_id', filtro.accountId)
+    if (filtro?.categoryId) p.set('category_id', filtro.categoryId)
+    if (filtro?.tipo) p.set('tipo', filtro.tipo)
+    if (filtro?.desde) p.set('desde', filtro.desde)
+    if (filtro?.hasta) p.set('hasta', filtro.hasta)
+    const q = p.toString()
+    return request<Transaction[]>(`/transactions${q ? `?${q}` : ''}`)
+  },
   createTransaction: (t: NuevaTransaccion) =>
     request<Transaction>('/transactions', {
       method: 'POST',

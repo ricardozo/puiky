@@ -3,24 +3,27 @@ import { api, type Task } from '../api'
 import { TaskEditor } from './Board'
 
 const colorEstado: Record<string, string> = {
-  planeada: 'bg-slate-700 text-slate-300',
-  en_ejecucion: 'bg-indigo-600/30 text-indigo-300',
-  en_pausa: 'bg-amber-600/30 text-amber-300',
-  terminada: 'bg-emerald-600/30 text-emerald-300',
+  planeada: 'pill-mute',
+  en_ejecucion: 'pill-active',
+  en_pausa: 'pill-warn',
+  terminada: 'pill-ok',
 }
 
 function vencimiento(t: Task): { texto: string; clase: string } {
-  if (!t.fecha_limite) return { texto: 'sin fecha', clase: 'text-slate-600' }
+  if (!t.fecha_limite) return { texto: 'sin fecha', clase: 'text-faint' }
   const hoy = new Date()
   hoy.setHours(0, 0, 0, 0)
   const venc = new Date(t.fecha_limite + 'T00:00')
   const dias = Math.round((venc.getTime() - hoy.getTime()) / 86400000)
   const fecha = venc.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
-  if (t.estado === 'terminada') return { texto: fecha, clase: 'text-slate-500' }
-  if (dias < 0) return { texto: `${fecha} · vencida`, clase: 'text-red-400' }
-  if (dias === 0) return { texto: `${fecha} · hoy`, clase: 'text-red-300' }
-  if (dias <= 3) return { texto: `${fecha} · en ${dias}d`, clase: 'text-amber-300' }
-  return { texto: fecha, clase: 'text-slate-400' }
+  if (t.estado === 'terminada') return { texto: fecha, clase: 'text-faint' }
+  if (dias < 0)
+    return { texto: `${fecha} · vencida`, clase: 'text-[color:var(--c-danger)]' }
+  if (dias === 0)
+    return { texto: `${fecha} · hoy`, clase: 'text-[color:var(--c-danger)]' }
+  if (dias <= 3)
+    return { texto: `${fecha} · en ${dias}d`, clase: 'text-brand' }
+  return { texto: fecha, clase: 'text-muted' }
 }
 
 export default function Tareas() {
@@ -49,18 +52,16 @@ export default function Tareas() {
 
   return (
     <div className="space-y-5 max-w-3xl">
-      <h2 className="text-xl font-semibold">Tareas</h2>
+      <h2 className="font-serif text-2xl">Tareas</h2>
 
       <form onSubmit={buscar} className="flex gap-2">
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Buscar tarea por título…"
-          className="flex-1 rounded-lg bg-slate-900 border border-slate-700 px-4 py-2.5 outline-none focus:border-indigo-500"
+          className="input flex-1"
         />
-        <button className="rounded-lg border border-slate-700 px-4 hover:bg-slate-800">
-          Buscar
-        </button>
+        <button className="btn-ghost btn">Buscar</button>
         {q && (
           <button
             type="button"
@@ -68,49 +69,43 @@ export default function Tareas() {
               setQ('')
               cargar()
             }}
-            className="rounded-lg border border-slate-700 px-4 hover:bg-slate-800"
+            className="btn-ghost btn"
           >
             Limpiar
           </button>
         )}
       </form>
 
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-faint">
         Ordenadas por fecha de vencimiento (las sin fecha, al final).
       </p>
 
       {cargando ? (
-        <p className="text-slate-500">Cargando…</p>
+        <p className="text-faint">Cargando…</p>
       ) : tasks.length === 0 ? (
-        <p className="text-slate-500">Sin tareas.</p>
+        <p className="text-faint">Sin tareas.</p>
       ) : (
-        <ul className="divide-y divide-slate-800 rounded-xl border border-slate-800">
+        <ul className="card divide-y divide-[color:var(--c-line)] p-0 overflow-hidden">
           {tasks.map((t) => {
             const v = vencimiento(t)
             return (
               <li key={t.id}>
                 <button
                   onClick={() => setAbierta(t)}
-                  className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-slate-800/40 transition"
+                  className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-surface-2 transition"
                 >
-                  <span
-                    className={`shrink-0 rounded px-2 py-0.5 text-xs ${
-                      colorEstado[t.estado] ?? 'bg-slate-800 text-slate-400'
-                    }`}
-                  >
+                  <span className={`pill shrink-0 ${colorEstado[t.estado] ?? 'pill-mute'}`}>
                     {t.estado}
                   </span>
                   <div className="min-w-0 flex-1">
                     <div
                       className={
-                        t.estado === 'terminada'
-                          ? 'line-through text-slate-500'
-                          : ''
+                        t.estado === 'terminada' ? 'line-through text-faint' : ''
                       }
                     >
                       {t.titulo}
                     </div>
-                    <div className="text-xs text-slate-500">
+                    <div className="text-xs text-muted">
                       {t.proyecto ? `📋 ${t.proyecto}` : 'sin proyecto'}
                       {t.checklist.length > 0 &&
                         ` · ☑ ${t.checklist.filter((i) => i.hecho).length}/${t.checklist.length}`}

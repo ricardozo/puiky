@@ -35,28 +35,26 @@ function Card({ task, onAbrir }: { task: Task; onAbrir: (t: Task) => void }) {
       {...listeners}
       {...attributes}
       onClick={() => onAbrir(task)}
-      className={`rounded-lg border border-slate-700 bg-slate-800 p-3 cursor-pointer active:cursor-grabbing ${
+      className={`rounded-lg border border-line bg-surface p-3 cursor-pointer active:cursor-grabbing shadow-[var(--shadow)] ${
         isDragging ? 'opacity-50' : ''
       }`}
     >
       <div className="text-sm">{task.titulo}</div>
       {task.checklist.length > 0 && (
-        <div className="text-xs text-slate-400 mt-1.5">
+        <div className="text-xs text-muted mt-1.5">
           ☑ {hechos(task)}/{task.checklist.length}
         </div>
       )}
       {task.avance_pct > 0 && (
-        <div className="mt-1.5 h-1 rounded bg-slate-700 overflow-hidden">
+        <div className="mt-1.5 h-1 rounded-full bg-surface-2 overflow-hidden">
           <div
-            className="h-full bg-indigo-500"
-            style={{ width: `${task.avance_pct}%` }}
+            className="h-full rounded-full"
+            style={{ width: `${task.avance_pct}%`, background: 'var(--c-teal)' }}
           />
         </div>
       )}
       {task.fecha_limite && (
-        <div className="text-xs text-slate-500 mt-1.5">
-          vence {task.fecha_limite}
-        </div>
+        <div className="text-xs text-faint mt-1.5">vence {task.fecha_limite}</div>
       )}
     </div>
   )
@@ -79,13 +77,13 @@ function Column({
       ref={setNodeRef}
       className={`w-64 shrink-0 rounded-xl border p-3 transition ${
         isOver
-          ? 'border-indigo-500 bg-indigo-500/5'
-          : 'border-slate-800 bg-slate-900/40'
+          ? 'border-teal bg-[var(--c-brand-soft)]'
+          : 'border-line bg-surface-2'
       }`}
     >
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm font-medium">{titulo}</span>
-        <span className="text-xs text-slate-500">{tasks.length}</span>
+        <span className="text-xs text-faint">{tasks.length}</span>
       </div>
       <div className="space-y-2 min-h-16">
         {tasks.map((t) => (
@@ -137,15 +135,15 @@ export default function Board() {
     cargar()
   }
 
-  if (!project) return <p className="text-slate-500">Cargando…</p>
+  if (!project) return <p className="text-faint">Cargando…</p>
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Link to="/proyectos" className="text-slate-400 hover:text-slate-200 text-sm">
+        <Link to="/proyectos" className="text-muted hover:text-ink text-sm">
           ← Proyectos
         </Link>
-        <h2 className="text-xl font-semibold">{project.nombre}</h2>
+        <h2 className="font-serif text-2xl">{project.nombre}</h2>
       </div>
 
       <form onSubmit={crearTarea} className="flex gap-2 max-w-xl">
@@ -153,11 +151,9 @@ export default function Board() {
           value={nuevo}
           onChange={(e) => setNuevo(e.target.value)}
           placeholder="Nueva tarea…"
-          className="flex-1 rounded-lg bg-slate-900 border border-slate-700 px-4 py-2.5 outline-none focus:border-indigo-500"
+          className="input flex-1"
         />
-        <button className="rounded-lg bg-indigo-600 hover:bg-indigo-500 px-4 font-medium">
-          Añadir
-        </button>
+        <button className="btn">Añadir</button>
       </form>
 
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
@@ -175,11 +171,9 @@ export default function Board() {
       </DndContext>
 
       {project.notes.length > 0 && (
-        <div className="pt-4 border-t border-slate-800">
-          <h3 className="text-sm font-medium text-slate-400 mb-2">
-            Notas del proyecto
-          </h3>
-          <ul className="space-y-1 text-sm text-slate-300">
+        <div className="pt-4 border-t border-line">
+          <h3 className="eyebrow mb-2">Notas del proyecto</h3>
+          <ul className="space-y-1 text-sm text-muted">
             {project.notes.map((n) => (
               <li key={n.id}>• {n.titulo || n.contenido}</li>
             ))}
@@ -210,7 +204,7 @@ function Fecha({
   onChange: (v: string | null) => void
 }) {
   return (
-    <label className="text-xs text-slate-400 flex flex-col gap-1">
+    <label className="text-xs text-muted flex flex-col gap-1">
       {label}
       <input
         type="date"
@@ -218,7 +212,7 @@ function Fecha({
         max="9999-12-31"
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value || null)}
-        className="rounded-lg bg-slate-950 border border-slate-700 px-2 py-1.5 text-slate-100 outline-none focus:border-indigo-500"
+        className="input py-1.5"
       />
     </label>
   )
@@ -250,6 +244,7 @@ export function TaskEditor({
   const delItem = async (itemId: string) =>
     setTask(await api.deleteChecklistItem(itemId))
   const delTask = async () => {
+    if (!window.confirm('¿Eliminar esta tarea?')) return
     await api.deleteTask(task.id)
     onClose()
   }
@@ -274,7 +269,7 @@ export function TaskEditor({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-6 space-y-5"
+        className="card w-full max-w-lg max-h-[85vh] overflow-y-auto p-6 space-y-5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">
@@ -282,36 +277,32 @@ export function TaskEditor({
             value={titulo}
             onChange={(e) => setTitulo(e.target.value)}
             onBlur={() => titulo.trim() && guardar({ titulo: titulo.trim() })}
-            className="flex-1 bg-transparent text-lg font-semibold outline-none"
+            className="flex-1 bg-transparent font-serif text-xl outline-none"
           />
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-200">
+          <button onClick={onClose} className="text-faint hover:text-ink">
             ✕
           </button>
         </div>
 
         <div className="flex items-center gap-3 text-sm">
-          <span className="rounded px-2 py-0.5 bg-slate-800 text-slate-300">
-            {task.estado}
-          </span>
-          <span className="text-slate-400">{task.avance_pct}% avance</span>
+          <span className="pill pill-mute">{task.estado}</span>
+          <span className="text-muted">{task.avance_pct}% avance</span>
           {task.estado === 'terminada' ? (
-            <button
-              onClick={reabrir}
-              className="ml-auto rounded-lg border border-slate-700 px-3 py-1 hover:bg-slate-800"
-            >
+            <button onClick={reabrir} className="btn-ghost btn ml-auto text-sm py-1.5">
               Reabrir
             </button>
           ) : (
             <button
               onClick={completar}
-              className="ml-auto rounded-lg bg-emerald-600/80 hover:bg-emerald-600 px-3 py-1 font-medium"
+              className="btn ml-auto text-sm py-1.5"
+              style={{ background: 'var(--c-green)', color: '#fff' }}
             >
               Marcar completada
             </button>
           )}
         </div>
 
-        <label className="text-xs text-slate-400 flex flex-col gap-1">
+        <label className="text-xs text-muted flex flex-col gap-1">
           Descripción
           <textarea
             value={desc}
@@ -319,7 +310,7 @@ export function TaskEditor({
             onBlur={() => guardar({ descripcion: desc.trim() || null })}
             rows={3}
             placeholder="¿De qué trata la tarea?"
-            className="rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-slate-100 outline-none focus:border-indigo-500"
+            className="input text-sm"
           />
         </label>
 
@@ -347,10 +338,10 @@ export function TaskEditor({
         </div>
 
         <div className="space-y-2">
-          <div className="text-sm font-medium text-slate-300">
+          <div className="text-sm font-medium">
             Checklist{' '}
             {task.checklist.length > 0 && (
-              <span className="text-slate-500 font-normal">
+              <span className="text-faint font-normal">
                 ({done}/{task.checklist.length})
               </span>
             )}
@@ -361,14 +352,14 @@ export function TaskEditor({
                 type="checkbox"
                 checked={i.hecho}
                 onChange={() => toggle(i.id, !i.hecho)}
-                className="size-4 accent-indigo-500"
+                className="size-4 accent-[color:var(--c-teal)]"
               />
-              <span className={i.hecho ? 'line-through text-slate-500' : ''}>
+              <span className={i.hecho ? 'line-through text-faint' : ''}>
                 {i.texto}
               </span>
               <button
                 onClick={() => delItem(i.id)}
-                className="ml-auto opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 text-sm"
+                className="ml-auto opacity-0 group-hover:opacity-100 text-faint hover:text-[color:var(--c-danger)] text-sm"
               >
                 ✕
               </button>
@@ -380,18 +371,15 @@ export function TaskEditor({
               onChange={(e) => setNuevoItem(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addItem()}
               placeholder="Nuevo ítem…"
-              className="flex-1 rounded-lg bg-slate-950 border border-slate-700 px-3 py-1.5 text-sm outline-none focus:border-indigo-500"
+              className="input flex-1 text-sm py-1.5"
             />
-            <button
-              onClick={addItem}
-              className="rounded-lg border border-slate-700 px-3 text-sm hover:bg-slate-800"
-            >
+            <button onClick={addItem} className="btn-ghost btn text-sm py-1.5">
               + Añadir
             </button>
           </div>
         </div>
 
-        <label className="text-xs text-slate-400 flex flex-col gap-1">
+        <label className="text-xs text-muted flex flex-col gap-1">
           Notas rápidas
           <textarea
             value={notas}
@@ -399,16 +387,16 @@ export function TaskEditor({
             onBlur={() => guardar({ notas: notas.trim() || null })}
             rows={2}
             placeholder="Apunte suelto que no amerita una hoja…"
-            className="rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-slate-100 outline-none focus:border-indigo-500"
+            className="input text-sm"
           />
         </label>
 
         <NotasVinculadas taskId={task.id} />
 
-        <div className="pt-2 border-t border-slate-800">
+        <div className="pt-2 border-t border-line">
           <button
             onClick={delTask}
-            className="text-slate-500 hover:text-red-400 text-sm"
+            className="text-faint hover:text-[color:var(--c-danger)] text-sm"
           >
             Eliminar tarea
           </button>
@@ -444,21 +432,19 @@ function NotasVinculadas({ taskId }: { taskId: string }) {
 
   return (
     <div className="space-y-2">
-      <div className="text-sm font-medium text-slate-300">
+      <div className="text-sm font-medium">
         Notas vinculadas{' '}
-        <span className="text-slate-500 font-normal">
-          (hojas · buscables)
-        </span>
+        <span className="text-faint font-normal">(hojas · buscables)</span>
       </div>
       {notas.map((n) => (
         <NotaVinculada key={n.id} nota={n} onDesvincular={() => desvincular(n.id)} />
       ))}
-      <div className="rounded-lg border border-dashed border-slate-700 p-2 space-y-2">
+      <div className="rounded-lg border border-dashed border-line p-2 space-y-2">
         <input
           value={titulo}
           onChange={(e) => setTitulo(e.target.value)}
           placeholder="Título (opcional)"
-          className="w-full bg-transparent text-sm outline-none placeholder:text-slate-600"
+          className="w-full bg-transparent text-sm outline-none placeholder:text-faint"
         />
         <div className="flex gap-2">
           <textarea
@@ -466,12 +452,9 @@ function NotasVinculadas({ taskId }: { taskId: string }) {
             onChange={(e) => setCuerpo(e.target.value)}
             placeholder="Nueva nota para esta tarea…"
             rows={2}
-            className="flex-1 rounded-lg bg-slate-950 border border-slate-700 px-3 py-1.5 text-sm outline-none focus:border-indigo-500"
+            className="input flex-1 text-sm py-1.5"
           />
-          <button
-            onClick={crear}
-            className="rounded-lg border border-slate-700 px-3 text-sm hover:bg-slate-800 shrink-0"
-          >
+          <button onClick={crear} className="btn-ghost btn text-sm py-1.5 shrink-0">
             + Añadir
           </button>
         </div>
@@ -497,19 +480,19 @@ function NotaVinculada({
     })
 
   return (
-    <div className="group rounded-lg border border-slate-800 bg-slate-950/60 p-2.5">
+    <div className="group rounded-lg border border-line bg-surface-2 p-2.5">
       <div className="flex items-center gap-2">
         <input
           value={titulo}
           onChange={(e) => setTitulo(e.target.value)}
           onBlur={guardar}
           placeholder="Sin título"
-          className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-slate-600"
+          className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-faint"
         />
         <button
           onClick={onDesvincular}
           title="Desvincular (no borra la hoja)"
-          className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 text-xs transition"
+          className="opacity-0 group-hover:opacity-100 text-faint hover:text-[color:var(--c-danger)] text-xs transition"
         >
           desvincular
         </button>
@@ -519,7 +502,7 @@ function NotaVinculada({
         onChange={(e) => setCuerpo(e.target.value)}
         onBlur={guardar}
         rows={2}
-        className="w-full mt-1 bg-transparent text-sm text-slate-300 outline-none resize-none"
+        className="w-full mt-1 bg-transparent text-sm text-muted outline-none resize-none"
       />
     </div>
   )
