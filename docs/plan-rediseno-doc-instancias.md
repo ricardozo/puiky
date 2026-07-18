@@ -1,6 +1,9 @@
 # Plan: rediseño visual · documento de arquitectura · instancias aisladas
 
 > Tres iniciativas independientes. Se pueden hacer en el orden que prefieras.
+>
+> **Decisiones tomadas (2026-07-17):** empezamos por **B (documento)**; el rediseño
+> será **claro + oscuro**; las instancias de la familia usarán **Telegram + web**.
 
 ---
 
