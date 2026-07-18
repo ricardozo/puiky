@@ -153,6 +153,14 @@ export interface NuevaTransaccion {
   category_id?: string | null
   nota?: string | null
 }
+export interface EditarTransaccion {
+  monto?: number
+  account_id?: string
+  cuenta_destino_id?: string | null
+  category_id?: string | null
+  fecha?: string
+  nota?: string | null
+}
 
 export interface Reminder {
   id: string
@@ -336,6 +344,11 @@ export const api = {
     request<Transaction>('/transactions', {
       method: 'POST',
       body: JSON.stringify(t),
+    }),
+  updateTransaction: (id: string, data: EditarTransaccion) =>
+    request<Transaction>(`/transactions/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
     }),
   deleteTransaction: (id: string) =>
     request<void>(`/transactions/${id}`, { method: 'DELETE' }),

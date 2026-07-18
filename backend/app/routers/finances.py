@@ -28,6 +28,7 @@ from app.schemas.finances import (
     TransactionCreate,
     TransactionOut,
     TransactionTipo,
+    TransactionUpdate,
 )
 from app.services import finances as service
 
@@ -190,6 +191,21 @@ def reporte_mensual(
             for cid, nombre, total in por_cat
         ],
     )
+
+
+@transactions_router.put("/{tx_id}", response_model=TransactionOut)
+def editar_movimiento(
+    tx_id: uuid.UUID, data: TransactionUpdate, db: Session = Depends(get_db)
+) -> TransactionOut:
+    """Edita un movimiento (monto, cuenta, categoría, destino, fecha o nota),
+    manteniendo los saldos coherentes. No cambia el tipo."""
+    try:
+        tx = service.update_transaction(db, tx_id, data)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    if tx is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Movimiento no encontrado")
+    return tx
 
 
 @transactions_router.delete("/{tx_id}", status_code=status.HTTP_204_NO_CONTENT)

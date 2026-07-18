@@ -170,6 +170,70 @@ def get_transaction(db: Session, tx_id: uuid.UUID) -> Transaction | None:
     return db.get(Transaction, tx_id)
 
 
+def update_transaction(db: Session, tx_id: uuid.UUID, data) -> Transaction | None:
+    """Edita un movimiento sin cambiar su tipo. Solo se tocan los campos
+    enviados; el saldo se mantiene coherente: se revierte el efecto anterior
+    y se aplica el nuevo. Errores de validación via ValueError (-> 400)."""
+    tx = db.get(Transaction, tx_id)
+    if tx is None:
+        return None
+
+    cambios = data.model_dump(exclude_unset=True)
+    tipo = tx.tipo  # inmutable
+
+    nuevo_monto = cambios.get("monto", tx.monto)
+    nueva_cuenta = cambios.get("account_id", tx.account_id)
+    nueva_categoria = cambios.get("category_id", tx.category_id)
+    nuevo_destino = cambios.get("cuenta_destino_id", tx.cuenta_destino_id)
+    nueva_fecha = cambios.get("fecha", tx.fecha)
+    nueva_nota = cambios.get("nota", tx.nota)
+
+    # --- validar la combinación resultante según el tipo ---
+    origen_new = db.get(Account, nueva_cuenta)
+    if origen_new is None:
+        raise ValueError("La cuenta de origen no existe")
+
+    destino_new: Account | None = None
+    if tipo == TRANSFERENCIA:
+        if nuevo_destino is None:
+            raise ValueError("Una transferencia requiere cuenta de destino")
+        if nuevo_destino == nueva_cuenta:
+            raise ValueError("La cuenta de destino debe ser distinta de la de origen")
+        if nueva_categoria is not None:
+            raise ValueError("Una transferencia no lleva categoría")
+        destino_new = db.get(Account, nuevo_destino)
+        if destino_new is None:
+            raise ValueError("La cuenta de destino no existe")
+    else:  # gasto / ingreso
+        if nuevo_destino is not None:
+            raise ValueError("Solo las transferencias llevan cuenta de destino")
+        if nueva_categoria is None:
+            raise ValueError("Un gasto o ingreso requiere categoría")
+        if db.get(Category, nueva_categoria) is None:
+            raise ValueError("La categoría no existe")
+
+    # --- revertir el efecto anterior (con los valores viejos) ---
+    origen_old = db.get(Account, tx.account_id)
+    destino_old = (
+        db.get(Account, tx.cuenta_destino_id) if tx.cuenta_destino_id else None
+    )
+    if origen_old is not None:
+        _mover_saldos(tipo, tx.monto, origen_old, destino_old, signo=-1)
+
+    # --- aplicar los valores nuevos y su efecto ---
+    tx.monto = nuevo_monto
+    tx.account_id = nueva_cuenta
+    tx.category_id = nueva_categoria
+    tx.cuenta_destino_id = nuevo_destino
+    tx.fecha = nueva_fecha
+    tx.nota = nueva_nota
+    _mover_saldos(tipo, nuevo_monto, origen_new, destino_new, signo=1)
+
+    db.commit()
+    db.refresh(tx)
+    return tx
+
+
 def list_transactions(
     db: Session,
     account_id: uuid.UUID | None = None,

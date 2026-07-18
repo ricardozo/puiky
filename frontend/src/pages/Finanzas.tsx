@@ -36,6 +36,158 @@ function BotonExcel({ filtro, label = 'Exportar a Excel' }: { filtro?: ExportFil
   )
 }
 
+// Modal para editar un movimiento (no cambia el tipo). Los saldos se ajustan
+// solos en el backend (revierte el efecto viejo, aplica el nuevo).
+function EditorMovimiento({
+  tx,
+  accounts,
+  categories,
+  onCerrar,
+  onGuardado,
+}: {
+  tx: Transaction
+  accounts: Account[]
+  categories: Category[]
+  onCerrar: () => void
+  onGuardado: () => void
+}) {
+  const esTransfer = tx.tipo === 'transferencia'
+  const [monto, setMonto] = useState(String(tx.monto))
+  const [cuenta, setCuenta] = useState(tx.account_id)
+  const [destino, setDestino] = useState(tx.cuenta_destino_id ?? '')
+  const [categoria, setCategoria] = useState(tx.category_id ?? '')
+  const [fecha, setFecha] = useState(tx.fecha)
+  const [nota, setNota] = useState(tx.nota ?? '')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const guardar = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      await api.updateTransaction(tx.id, {
+        monto: Number(monto),
+        account_id: cuenta,
+        cuenta_destino_id: esTransfer ? destino : null,
+        category_id: esTransfer ? null : categoria || null,
+        fecha,
+        nota: nota.trim() || null,
+      })
+      onGuardado()
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'No se pudo guardar')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4"
+      onClick={onCerrar}
+    >
+      <div
+        className="card w-full max-w-md p-6 space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="font-serif text-xl">Editar movimiento</h3>
+          <span className="badge">{tx.tipo}</span>
+        </div>
+
+        <label className="text-xs text-muted flex flex-col gap-1">
+          Monto
+          <input
+            type="number"
+            value={monto}
+            onChange={(e) => setMonto(e.target.value)}
+            className="input"
+          />
+        </label>
+
+        <label className="text-xs text-muted flex flex-col gap-1">
+          {esTransfer ? 'Cuenta origen' : 'Cuenta'}
+          <select value={cuenta} onChange={(e) => setCuenta(e.target.value)} className="input">
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.nombre}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {esTransfer ? (
+          <label className="text-xs text-muted flex flex-col gap-1">
+            Cuenta destino
+            <select
+              value={destino}
+              onChange={(e) => setDestino(e.target.value)}
+              className="input"
+            >
+              <option value="">—</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <label className="text-xs text-muted flex flex-col gap-1">
+            Categoría
+            <select
+              value={categoria}
+              onChange={(e) => setCategoria(e.target.value)}
+              className="input"
+            >
+              <option value="">—</option>
+              {categories
+                .filter((c) => c.activa || c.id === tx.category_id)
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}
+                  </option>
+                ))}
+            </select>
+          </label>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <label className="text-xs text-muted flex flex-col gap-1">
+            Fecha
+            <input
+              type="date"
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value)}
+              className="input"
+            />
+          </label>
+          <label className="text-xs text-muted flex flex-col gap-1">
+            Nota
+            <input
+              value={nota}
+              onChange={(e) => setNota(e.target.value)}
+              placeholder="opcional"
+              className="input"
+            />
+          </label>
+        </div>
+
+        {error && <p className="text-[color:var(--c-danger)] text-sm">{error}</p>}
+
+        <div className="flex justify-end gap-2 pt-1">
+          <button onClick={onCerrar} className="btn-ghost btn">
+            Cancelar
+          </button>
+          <button onClick={guardar} disabled={busy} className="btn">
+            {busy ? 'Guardando…' : 'Guardar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 type Vista =
   | { tipo: 'panel' }
   | { tipo: 'cuenta'; account: Account }
@@ -108,6 +260,8 @@ export default function Finanzas() {
         subtitulo={acc.tipo}
         saldoActual={acc.saldo}
         exportBase={{ accountId: acc.id }}
+        accounts={accounts}
+        categories={categories}
         onVolver={volver}
         fetchTxs={(desde, hasta) => api.listTransactions({ desde, hasta })}
         clasificar={(tx) => {
@@ -135,6 +289,8 @@ export default function Finanzas() {
         titulo={cat.nombre}
         subtitulo="categoría"
         exportBase={{ categoryId: cat.id }}
+        accounts={accounts}
+        categories={categories}
         onVolver={volver}
         fetchTxs={(desde, hasta) =>
           api.listTransactions({ categoryId: cat.id, desde, hasta })
@@ -173,6 +329,8 @@ export default function Finanzas() {
       <Movimiento accounts={accounts} categories={categories} onCambio={cargar} />
       <Movimientos
         transactions={transactions}
+        accounts={accounts}
+        categories={categories}
         nombreCuenta={nombreCuenta}
         nombreCategoria={nombreCategoria}
         onCambio={cargar}
@@ -442,15 +600,20 @@ const signoTipo: Record<string, { s: string; cls: string }> = {
 
 function Movimientos({
   transactions,
+  accounts,
+  categories,
   nombreCuenta,
   nombreCategoria,
   onCambio,
 }: {
   transactions: Transaction[]
+  accounts: Account[]
+  categories: Category[]
   nombreCuenta: (id: string | null) => string
   nombreCategoria: (id: string | null) => string
   onCambio: () => void
 }) {
+  const [editando, setEditando] = useState<Transaction | null>(null)
   const eliminar = async (id: string) => {
     if (!window.confirm('¿Eliminar este movimiento? Se revertirá el saldo.')) return
     await api.deleteTransaction(id)
@@ -458,6 +621,18 @@ function Movimientos({
   }
   return (
     <section className="space-y-3">
+      {editando && (
+        <EditorMovimiento
+          tx={editando}
+          accounts={accounts}
+          categories={categories}
+          onCerrar={() => setEditando(null)}
+          onGuardado={() => {
+            setEditando(null)
+            onCambio()
+          }}
+        />
+      )}
       <h3 className="eyebrow">Movimientos recientes</h3>
       {transactions.length === 0 ? (
         <p className="text-faint text-sm">Sin movimientos.</p>
@@ -481,11 +656,18 @@ function Movimientos({
                   </span>
                   {t.nota && <span className="text-faint ml-2 truncate">— {t.nota}</span>}
                 </div>
-                <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
                   <span className="text-xs text-faint tabular-nums">{t.fecha}</span>
                   <button
+                    onClick={() => setEditando(t)}
+                    className="opacity-0 group-hover:opacity-100 text-faint hover:text-brand transition"
+                    title="Editar"
+                  >
+                    ✎
+                  </button>
+                  <button
                     onClick={() => eliminar(t.id)}
-                    className={`opacity-0 group-hover:opacity-100 text-faint hover:text-[color:var(--c-danger)] transition`}
+                    className="opacity-0 group-hover:opacity-100 text-faint hover:text-[color:var(--c-danger)] transition"
                     title="Eliminar (revierte el saldo)"
                   >
                     ✕
@@ -602,6 +784,8 @@ function DetalleLibro({
   subtitulo,
   saldoActual,
   exportBase,
+  accounts,
+  categories,
   onVolver,
   fetchTxs,
   clasificar,
@@ -610,6 +794,8 @@ function DetalleLibro({
   subtitulo: string
   saldoActual?: string
   exportBase?: { accountId?: string; categoryId?: string }
+  accounts: Account[]
+  categories: Category[]
   onVolver: () => void
   fetchTxs: (desde: string, hasta: string) => Promise<Transaction[]>
   clasificar: (tx: Transaction) => Clasificacion | null
@@ -618,6 +804,7 @@ function DetalleLibro({
   const [hasta, setHasta] = useState(hoyStr())
   const [txs, setTxs] = useState<Transaction[]>([])
   const [cargando, setCargando] = useState(true)
+  const [editando, setEditando] = useState<Transaction | null>(null)
 
   const recargar = useCallback(() => {
     setCargando(true)
@@ -658,6 +845,18 @@ function DetalleLibro({
 
   return (
     <div className="space-y-6 max-w-4xl">
+      {editando && (
+        <EditorMovimiento
+          tx={editando}
+          accounts={accounts}
+          categories={categories}
+          onCerrar={() => setEditando(null)}
+          onGuardado={() => {
+            setEditando(null)
+            recargar()
+          }}
+        />
+      )}
       <button onClick={onVolver} className="text-muted hover:text-ink text-sm">
         ← Finanzas
       </button>
@@ -738,6 +937,7 @@ function DetalleLibro({
             signo="−"
             items={salidas}
             onEliminar={eliminar}
+            onEditar={setEditando}
           />
           <Columna
             titulo="Entradas"
@@ -746,6 +946,7 @@ function DetalleLibro({
             signo="+"
             items={entradas}
             onEliminar={eliminar}
+            onEditar={setEditando}
           />
         </div>
       )}
@@ -771,6 +972,7 @@ function Columna({
   signo,
   items,
   onEliminar,
+  onEditar,
 }: {
   titulo: string
   colorTitulo: string
@@ -778,6 +980,7 @@ function Columna({
   signo: string
   items: { tx: Transaction; etiqueta: string }[]
   onEliminar: (id: string) => void
+  onEditar: (tx: Transaction) => void
 }) {
   return (
     <div className="card p-0 overflow-hidden">
@@ -803,13 +1006,20 @@ function Columna({
                 </div>
                 <div className="text-xs text-faint tabular-nums mt-0.5">{tx.fecha}</div>
               </div>
-              <div className="flex items-center gap-3 shrink-0">
+              <div className="flex items-center gap-2 shrink-0">
                 <span className={`tabular-nums ${colorTitulo}`}>
                   {signo}${fmtMoney(tx.monto)}
                 </span>
                 <button
+                  onClick={() => onEditar(tx)}
+                  className="opacity-0 group-hover:opacity-100 text-faint hover:text-brand transition"
+                  title="Editar"
+                >
+                  ✎
+                </button>
+                <button
                   onClick={() => onEliminar(tx.id)}
-                  className={`opacity-0 group-hover:opacity-100 text-faint hover:text-[color:var(--c-danger)] transition`}
+                  className="opacity-0 group-hover:opacity-100 text-faint hover:text-[color:var(--c-danger)] transition"
                   title="Eliminar (revierte el saldo)"
                 >
                   ✕

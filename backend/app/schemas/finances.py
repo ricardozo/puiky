@@ -72,6 +72,18 @@ class TransactionCreate(BaseModel):
     nota: str | None = Field(default=None, max_length=500)
 
 
+class TransactionUpdate(BaseModel):
+    """Edición de un movimiento (no cambia el tipo). Solo los campos enviados
+    se modifican; el servicio revierte el efecto viejo y aplica el nuevo."""
+
+    monto: Decimal | None = Field(default=None, gt=0)
+    account_id: uuid.UUID | None = None
+    cuenta_destino_id: uuid.UUID | None = None
+    category_id: uuid.UUID | None = None
+    fecha: date | None = None
+    nota: str | None = Field(default=None, max_length=500)
+
+
 class TransactionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
