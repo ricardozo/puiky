@@ -15,13 +15,19 @@ from typing import Any, Callable
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.finances import Account, Category
+from app.models.finances import Account, Budget, Category, Transaction
 from app.models.notebooks import Notebook
 from app.models.notes import Note
 from app.models.portfolios import Portfolio
 from app.models.projects import Project
 from app.models.tasks import Task
-from app.schemas.finances import AccountCreate, TransactionCreate, TransactionTipo
+from app.schemas.finances import (
+    AccountCreate,
+    BudgetCreate,
+    CategoryCreate,
+    TransactionCreate,
+    TransactionTipo,
+)
 from app.schemas.notebooks import NotebookCreate
 from app.schemas.notes import NoteCreate, NoteLinkCreate, NoteUpdate
 from app.schemas.portfolios import PortfolioCreate
@@ -552,6 +558,124 @@ def _gastos_del_mes(db: Session, a: dict) -> dict:
     }
 
 
+def _crear_cuenta(db: Session, a: dict) -> dict:
+    acc = fin.create_account(
+        db,
+        AccountCreate(
+            nombre=a["nombre"],
+            tipo=a.get("tipo") or "efectivo",
+            saldo_inicial=a.get("saldo_inicial") or 0,
+        ),
+    )
+    return {"ok": True, "cuenta": acc.nombre, "saldo": _money(acc.saldo)}
+
+
+def _listar_cuentas(db: Session, a: dict) -> dict:
+    cuentas = fin.list_accounts(db)
+    total = sum(float(c.saldo) for c in cuentas)
+    return {
+        "ok": True,
+        "cuentas": [
+            {"nombre": c.nombre, "tipo": c.tipo, "saldo": _money(c.saldo)}
+            for c in cuentas
+        ],
+        "total": f"{total:.2f}",
+    }
+
+
+def _crear_categoria(db: Session, a: dict) -> dict:
+    c = fin.create_category(db, CategoryCreate(nombre=a["nombre"]))
+    return {"ok": True, "categoria": c.nombre}
+
+
+def _nombre_cuenta(db: Session, id_) -> str:
+    c = db.get(Account, id_) if id_ else None
+    return c.nombre if c else "—"
+
+
+def _nombre_categoria(db: Session, id_) -> str:
+    c = db.get(Category, id_) if id_ else None
+    return c.nombre if c else "—"
+
+
+def _listar_movimientos(db: Session, a: dict) -> dict:
+    acc_id = _resolver_cuenta(db, a["cuenta"]).id if a.get("cuenta") else None
+    txs = fin.list_transactions(db, account_id=acc_id)[:15]
+    return {
+        "ok": True,
+        "movimientos": [
+            {
+                "tipo": t.tipo,
+                "monto": _money(t.monto),
+                "cuenta": _nombre_cuenta(db, t.account_id),
+                "categoria": _nombre_categoria(db, t.category_id),
+                "fecha": t.fecha.isoformat(),
+            }
+            for t in txs
+        ],
+    }
+
+
+def _eliminar_ultimo_movimiento(db: Session, a: dict) -> dict:
+    tx = db.execute(
+        select(Transaction).order_by(Transaction.fecha.desc()).limit(1)
+    ).scalar_one_or_none()
+    if tx is None:
+        raise ValueError("No hay movimientos para eliminar.")
+    cuenta = _nombre_cuenta(db, tx.account_id)
+    return {
+        "ok": True,
+        "confirmar": {
+            "tipo": "transaction",
+            "id": str(tx.id),
+            "que": f"el último movimiento ({tx.tipo} de {_money(tx.monto)} en {cuenta})",
+        },
+    }
+
+
+def _definir_presupuesto(db: Session, a: dict) -> dict:
+    cat_id = _resolver_categoria(db, a["categoria"]).id if a.get("categoria") else None
+    b = fin.create_budget(db, BudgetCreate(tope=a["tope"], category_id=cat_id))
+    return {
+        "ok": True,
+        "tope": _money(b.tope),
+        "categoria": a.get("categoria") or "global",
+    }
+
+
+def _progreso_budget(db: Session, b: Budget) -> dict:
+    hoy = date.today()
+    _, gastado = fin.budget_progress(db, b.id, hoy.year, hoy.month)
+    pct = round(float(gastado / b.tope * 100)) if b.tope else 0
+    return {
+        "categoria": _nombre_categoria(db, b.category_id)
+        if b.category_id
+        else "global",
+        "gastado": _money(gastado),
+        "tope": _money(b.tope),
+        "restante": _money(b.tope - gastado),
+        "porcentaje": pct,
+    }
+
+
+def _avance_presupuesto(db: Session, a: dict) -> dict:
+    cat_id = _resolver_categoria(db, a["categoria"]).id if a.get("categoria") else None
+    budget = db.execute(
+        select(Budget).where(Budget.category_id == cat_id)
+    ).scalars().first()
+    if budget is None:
+        cual = "esa categoría" if cat_id else "el mes (global)"
+        raise ValueError(f"No hay un presupuesto para {cual}.")
+    return {"ok": True, **_progreso_budget(db, budget)}
+
+
+def _listar_presupuestos(db: Session, a: dict) -> dict:
+    return {
+        "ok": True,
+        "presupuestos": [_progreso_budget(db, b) for b in fin.list_budgets(db)],
+    }
+
+
 def _crear_recordatorio(db: Session, a: dict) -> dict:
     disparar = (
         datetime.fromisoformat(a["disparar_en"])
@@ -845,6 +969,57 @@ TOOLS: list[Tool] = [
         "Resumen de los gastos del mes actual, con desglose por categoría.",
         _p({}, []),
         _gastos_del_mes,
+    ),
+    Tool(
+        "crear_cuenta",
+        "Crea una cuenta. tipo sugerido: efectivo|banco|ahorros. saldo_inicial opcional.",
+        _p({"nombre": _STR, "tipo": _STR, "saldo_inicial": _NUM}, ["nombre"]),
+        _crear_cuenta,
+    ),
+    Tool(
+        "listar_cuentas",
+        "Lista las cuentas con su saldo y el total.",
+        _p({}, []),
+        _listar_cuentas,
+    ),
+    Tool(
+        "crear_categoria",
+        "Crea una categoría de finanzas.",
+        _p({"nombre": _STR}, ["nombre"]),
+        _crear_categoria,
+    ),
+    Tool(
+        "listar_movimientos",
+        "Lista los movimientos recientes (de una cuenta si se indica).",
+        _p({"cuenta": _STR}, []),
+        _listar_movimientos,
+    ),
+    Tool(
+        "eliminar_ultimo_movimiento",
+        "Elimina el último movimiento registrado (revierte el saldo). Pide "
+        "confirmación antes de borrar.",
+        _p({}, []),
+        _eliminar_ultimo_movimiento,
+    ),
+    Tool(
+        "definir_presupuesto",
+        "Define un presupuesto mensual. Con categoría es por categoría; sin "
+        "categoría es el presupuesto global del mes.",
+        _p({"tope": _NUM, "categoria": _STR}, ["tope"]),
+        _definir_presupuesto,
+    ),
+    Tool(
+        "avance_presupuesto",
+        "Consulta el avance de un presupuesto (gastado vs tope este mes). Sin "
+        "categoría consulta el global.",
+        _p({"categoria": _STR}, []),
+        _avance_presupuesto,
+    ),
+    Tool(
+        "listar_presupuestos",
+        "Lista los presupuestos con su avance del mes.",
+        _p({}, []),
+        _listar_presupuestos,
     ),
     Tool(
         "crear_recordatorio",
