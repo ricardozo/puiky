@@ -20,6 +20,8 @@ from app.models.notebooks import Notebook
 from app.models.notes import Note
 from app.models.portfolios import Portfolio
 from app.models.projects import Project
+from app.models.reminders import Reminder
+from app.models.responsibilities import Responsibility
 from app.models.tasks import Task
 from app.schemas.finances import (
     AccountCreate,
@@ -33,7 +35,7 @@ from app.schemas.notes import NoteCreate, NoteLinkCreate, NoteUpdate
 from app.schemas.portfolios import PortfolioCreate
 from app.schemas.projects import ProjectCreate, ProjectEstado, ProjectUpdate
 from app.schemas.reminders import ReminderCreate
-from app.schemas.responsibilities import ResponsibilityCreate
+from app.schemas.responsibilities import ResponsibilityCreate, ResponsibilityUpdate
 from app.schemas.tasks import (
     ChecklistItemCreate,
     ChecklistItemUpdate,
@@ -701,6 +703,130 @@ def _crear_responsabilidad(db: Session, a: dict) -> dict:
     return {"ok": True, "nombre": r.nombre, "proximo_venc": r.proximo_venc.isoformat()}
 
 
+def _resolver_responsabilidad(db: Session, ref: str) -> Responsibility:
+    return _resolver(
+        db, Responsibility, Responsibility.nombre, ref, "una responsabilidad"
+    )
+
+
+def _resolver_recordatorio(db: Session, ref: str) -> Reminder:
+    ref = (ref or "").strip()
+    if not ref:
+        raise ValueError("Falta indicar el recordatorio.")
+    filas = list(
+        db.execute(
+            select(Reminder).where(
+                Reminder.texto.ilike(f"%{ref}%"), Reminder.resuelto.is_(False)
+            )
+        ).scalars().all()
+    )
+    if not filas:
+        raise ValueError(f"No encontré un recordatorio pendiente con «{ref}».")
+    if len(filas) > 1:
+        textos = ", ".join(r.texto[:30] for r in filas[:5])
+        raise ValueError(f"«{ref}» coincide con varios recordatorios: {textos}.")
+    return filas[0]
+
+
+def _listar_responsabilidades(db: Session, a: dict) -> dict:
+    rs = resp_svc.list_responsibilities(db)
+    return {
+        "ok": True,
+        "responsabilidades": [
+            {
+                "nombre": r.nombre,
+                "recurrencia": r.recurrencia,
+                "proximo_venc": r.proximo_venc.isoformat(),
+                "monto": _money(r.monto) if r.monto is not None else None,
+            }
+            for r in rs
+        ],
+    }
+
+
+def _cumplir_responsabilidad(db: Session, a: dict) -> dict:
+    r = _resolver_responsabilidad(db, a["responsabilidad"])
+    r2 = resp_svc.fulfill_responsibility(db, r.id)
+    return {
+        "ok": True,
+        "responsabilidad": r2.nombre,
+        "proximo_venc": r2.proximo_venc.isoformat(),
+    }
+
+
+def _editar_responsabilidad(db: Session, a: dict) -> dict:
+    r = _resolver_responsabilidad(db, a["responsabilidad"])
+    campos: dict[str, Any] = {}
+    if a.get("nuevo_nombre"):
+        campos["nombre"] = a["nuevo_nombre"]
+    if a.get("recurrencia"):
+        campos["recurrencia"] = a["recurrencia"]
+    if a.get("proximo_venc"):
+        campos["proximo_venc"] = date.fromisoformat(a["proximo_venc"])
+    if a.get("monto") is not None:
+        campos["monto"] = a["monto"]
+    if not campos:
+        raise ValueError("No indicaste qué cambiar de la responsabilidad.")
+    r2 = resp_svc.update_responsibility(db, r.id, ResponsibilityUpdate(**campos))
+    return {"ok": True, "responsabilidad": r2.nombre}
+
+
+def _eliminar_responsabilidad(db: Session, a: dict) -> dict:
+    r = _resolver_responsabilidad(db, a["responsabilidad"])
+    return {
+        "ok": True,
+        "confirmar": {
+            "tipo": "responsibility",
+            "id": str(r.id),
+            "que": f"la responsabilidad «{r.nombre}»",
+        },
+    }
+
+
+def _listar_recordatorios(db: Session, a: dict) -> dict:
+    rs = rem_svc.list_reminders(db, resuelto=False)
+    return {
+        "ok": True,
+        "recordatorios": [
+            {
+                "texto": r.texto,
+                "cuando": (r.pospuesto_para or r.disparar_en).isoformat(),
+                "avisos": r.veces_avisado,
+            }
+            for r in rs
+        ],
+    }
+
+
+def _recordatorios_vencidos(db: Session, a: dict) -> dict:
+    return {"ok": True, "recordatorios": [r.texto for r in rem_svc.list_due(db)]}
+
+
+def _posponer_recordatorio(db: Session, a: dict) -> dict:
+    r = _resolver_recordatorio(db, a["recordatorio"])
+    cuando = datetime.fromisoformat(a["cuando"])
+    rem_svc.snooze_reminder(db, r.id, cuando)
+    return {"ok": True, "recordatorio": r.texto, "pospuesto_para": cuando.isoformat()}
+
+
+def _marcar_recordatorio_resuelto(db: Session, a: dict) -> dict:
+    r = _resolver_recordatorio(db, a["recordatorio"])
+    rem_svc.resolve_reminder(db, r.id)
+    return {"ok": True, "resuelto": r.texto}
+
+
+def _eliminar_recordatorio(db: Session, a: dict) -> dict:
+    r = _resolver_recordatorio(db, a["recordatorio"])
+    return {
+        "ok": True,
+        "confirmar": {
+            "tipo": "reminder",
+            "id": str(r.id),
+            "que": f"el recordatorio «{r.texto[:40]}»",
+        },
+    }
+
+
 # --- Registro de tools ---
 
 
@@ -1035,6 +1161,73 @@ TOOLS: list[Tool] = [
             ["nombre", "recurrencia", "proximo_venc"],
         ),
         _crear_responsabilidad,
+    ),
+    Tool(
+        "listar_responsabilidades",
+        "Lista las responsabilidades por próximo vencimiento.",
+        _p({}, []),
+        _listar_responsabilidades,
+    ),
+    Tool(
+        "cumplir_responsabilidad",
+        "Marca una responsabilidad como cumplida (por su nombre); recalcula el "
+        "próximo vencimiento según su recurrencia.",
+        _p({"responsabilidad": _STR}, ["responsabilidad"]),
+        _cumplir_responsabilidad,
+    ),
+    Tool(
+        "editar_responsabilidad",
+        "Edita una responsabilidad (por su nombre): nuevo_nombre, recurrencia, "
+        "proximo_venc (YYYY-MM-DD) y/o monto.",
+        _p(
+            {
+                "responsabilidad": _STR,
+                "nuevo_nombre": _STR,
+                "recurrencia": _STR,
+                "proximo_venc": _STR,
+                "monto": _NUM,
+            },
+            ["responsabilidad"],
+        ),
+        _editar_responsabilidad,
+    ),
+    Tool(
+        "eliminar_responsabilidad",
+        "Elimina una responsabilidad (por su nombre). Pide confirmación.",
+        _p({"responsabilidad": _STR}, ["responsabilidad"]),
+        _eliminar_responsabilidad,
+    ),
+    # --- Recordatorios ---
+    Tool(
+        "listar_recordatorios",
+        "Lista los recordatorios pendientes (sin resolver).",
+        _p({}, []),
+        _listar_recordatorios,
+    ),
+    Tool(
+        "recordatorios_vencidos",
+        "Lista los recordatorios cuyo momento ya llegó y siguen sin resolver.",
+        _p({}, []),
+        _recordatorios_vencidos,
+    ),
+    Tool(
+        "posponer_recordatorio",
+        "Pospone un recordatorio (por su texto) a `cuando` en ISO 8601 (usa la "
+        "fecha/hora actual del contexto).",
+        _p({"recordatorio": _STR, "cuando": _STR}, ["recordatorio", "cuando"]),
+        _posponer_recordatorio,
+    ),
+    Tool(
+        "resolver_recordatorio",
+        "Marca un recordatorio como resuelto (por su texto).",
+        _p({"recordatorio": _STR}, ["recordatorio"]),
+        _marcar_recordatorio_resuelto,
+    ),
+    Tool(
+        "eliminar_recordatorio",
+        "Elimina un recordatorio (por su texto). Pide confirmación.",
+        _p({"recordatorio": _STR}, ["recordatorio"]),
+        _eliminar_recordatorio,
     ),
 ]
 
