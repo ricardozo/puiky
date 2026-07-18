@@ -1,33 +1,24 @@
-"""Crea o actualiza el usuario de la interfaz web (no hay registro público).
+"""Crea o actualiza un usuario web y provisiona su inquilino (schema + dominio).
 
-Uso:  python -m app.create_user <usuario> <password>
+Uso:  python -m app.create_user <usuario> <password> [slug]
+
+Si no se da `slug`, se usa el `usuario` como slug. El schema del inquilino será
+`t_<slug>`. Requiere que la cadena de control ya esté aplicada en `public`.
 """
 
 import sys
 
-from sqlalchemy import select
-
-from app.auth.security import hash_password
-from app.database import SessionLocal
-from app.models.users import User
+from app.provision import crear_usuario
 
 
 def main() -> None:
-    if len(sys.argv) != 3:
-        raise SystemExit("Uso: python -m app.create_user <usuario> <password>")
-    usuario, password = sys.argv[1], sys.argv[2]
-    with SessionLocal() as db:
-        user = db.execute(
-            select(User).where(User.usuario == usuario)
-        ).scalar_one_or_none()
-        if user is None:
-            db.add(User(usuario=usuario, password_hash=hash_password(password)))
-            accion = "creado"
-        else:
-            user.password_hash = hash_password(password)
-            accion = "actualizado"
-        db.commit()
-    print(f"Usuario '{usuario}' {accion}.")
+    args = sys.argv[1:]
+    if len(args) not in (2, 3):
+        raise SystemExit("Uso: python -m app.create_user <usuario> <password> [slug]")
+    usuario, password = args[0], args[1]
+    slug = args[2] if len(args) == 3 else usuario
+    schema, accion = crear_usuario(usuario, password, slug)
+    print(f"Usuario '{usuario}' {accion} (inquilino {schema}).")
 
 
 if __name__ == "__main__":

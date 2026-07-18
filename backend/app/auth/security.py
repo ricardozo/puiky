@@ -39,23 +39,28 @@ def verify_password(password: str, stored: str) -> bool:
         return False
 
 
-def crear_token(usuario: str) -> str:
+def crear_token(usuario: str, tenant: str | None = None) -> str:
     s = get_settings()
     ahora = datetime.now(timezone.utc)
-    payload = {
+    payload: dict = {
         "sub": usuario,
         "iat": ahora,
         "exp": ahora + timedelta(minutes=s.jwt_expire_minutes),
     }
+    if tenant is not None:
+        payload["tenant"] = tenant
     return jwt.encode(payload, s.jwt_secret, algorithm=_ALGO)
 
 
 def verificar_token(token: str) -> str | None:
     """Devuelve el usuario (sub) si el token es válido, si no None."""
+    claims = verificar_token_claims(token)
+    return claims.get("sub") if claims else None
+
+
+def verificar_token_claims(token: str) -> dict | None:
+    """Devuelve el payload completo del JWT si es válido, si no None."""
     try:
-        payload = jwt.decode(
-            token, get_settings().jwt_secret, algorithms=[_ALGO]
-        )
-        return payload.get("sub")
+        return jwt.decode(token, get_settings().jwt_secret, algorithms=[_ALGO])
     except jwt.PyJWTError:
         return None

@@ -7,7 +7,7 @@ encadena ambas (audio → texto → acciones), tal como hará el bot en la Fase 
 from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.tenancy import get_tenant_db as get_db
 from app.nlu.orchestrator import interpret
 from app.nlu.transcriber import get_transcriber
 from app.schemas.nlu import (

@@ -1,15 +1,24 @@
-"""Handlers del bot de Telegram."""
+"""Handlers del bot de Telegram (multi-usuario).
+
+Cada mensaje se resuelve por `telegram_id → usuario` (tabla `public.telegram_link`)
+y todas las llamadas a la API llevan `X-Tenant-User`, así el backend opera en el
+schema de esa persona. Un remitente sin enlace queda fuera (reemplaza al antiguo
+allowlist de IDs).
+"""
 
 from __future__ import annotations
 
 import logging
 
+from sqlalchemy import text
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
 from app.bot.client import PuikyClient
 from app.config import get_settings
+from app.database import SessionLocal
+from app.models.users import TelegramLink
 
 logger = logging.getLogger("puiky.bot")
 
@@ -26,28 +35,35 @@ BIENVENIDA = (
 )
 
 
-def esta_autorizado(uid: int | None, allowed: set[int]) -> bool:
-    """Lógica pura de la allowlist (testeable sin Telegram)."""
-    return uid is not None and uid in allowed
+def resolver_user_id(telegram_id: int | None) -> str | None:
+    """Devuelve el id del usuario de Puiky enlazado a ese Telegram, o None."""
+    if telegram_id is None:
+        return None
+    with SessionLocal() as db:
+        db.execute(text("SET search_path TO public"))
+        link = db.get(TelegramLink, telegram_id)
+        if link is None or not link.activo:
+            return None
+        return str(link.user_id)
 
 
-async def _bloquear_no_autorizado(update: Update) -> bool:
-    """Si el usuario no está autorizado, le responde con su ID y corta."""
+async def _resolver_o_bloquear(update: Update) -> str | None:
+    """Resuelve el usuario del remitente; si no está enlazado, avisa y corta."""
     uid = update.effective_user.id if update.effective_user else None
-    if esta_autorizado(uid, get_settings().allowed_ids):
-        return False
-    if update.message:
-        await update.message.reply_text(
-            "No estás autorizado para usar este bot.\n"
-            f"Tu ID de Telegram es: {uid}\n"
-            "Pídele al administrador que lo agregue a la allowlist."
-        )
-    logger.info("Mensaje de ID no autorizado: %s", uid)
-    return True
+    user_id = resolver_user_id(uid)
+    if user_id is None:
+        if update.message:
+            await update.message.reply_text(
+                "No estás autorizado para usar este bot.\n"
+                f"Tu ID de Telegram es: {uid}\n"
+                "Pídele al administrador que te dé de alta con ese ID."
+            )
+        logger.info("Mensaje de ID no enlazado: %s", uid)
+    return user_id
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if await _bloquear_no_autorizado(update):
+    if await _resolver_o_bloquear(update) is None:
         return
     await update.message.reply_text(BIENVENIDA, parse_mode="Markdown")
 
@@ -98,19 +114,20 @@ def _recordar(context, entrada: str, respuesta: str) -> None:
     context.chat_data["historial"] = hist[-_MAX_HISTORIAL:]
 
 
-async def _procesar(update: Update, context, entrada: str) -> None:
-    """Interpreta `entrada` con la memoria del chat y responde."""
-    res = await _client.interpret(entrada, _historial(context))
+async def _procesar(update: Update, context, entrada: str, user_id: str) -> None:
+    """Interpreta `entrada` en el contexto del usuario y responde."""
+    res = await _client.interpret(entrada, _historial(context), tenant_user=user_id)
     _recordar(context, entrada, res.get("respuesta") or "")
     await _responder_interpretacion(update, res)
 
 
 async def texto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if await _bloquear_no_autorizado(update):
+    user_id = await _resolver_o_bloquear(update)
+    if user_id is None:
         return
     await update.effective_chat.send_action(ChatAction.TYPING)
     try:
-        await _procesar(update, context, update.message.text)
+        await _procesar(update, context, update.message.text, user_id)
     except Exception:
         logger.exception("Error interpretando texto")
         await update.message.reply_text("Ups, tuve un problema procesando eso.")
@@ -120,8 +137,8 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     """Maneja los botones de confirmación de borrado."""
     q = update.callback_query
     await q.answer()
-    uid = q.from_user.id if q.from_user else None
-    if not esta_autorizado(uid, get_settings().allowed_ids):
+    user_id = resolver_user_id(q.from_user.id if q.from_user else None)
+    if user_id is None:
         return
     data = q.data or ""
     if data == "cancel":
@@ -130,7 +147,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if data.startswith("del:"):
         _, tipo, entidad_id = data.split(":", 2)
         try:
-            await _client.delete_entity(tipo, entidad_id)
+            await _client.delete_entity(tipo, entidad_id, tenant_user=user_id)
             await q.edit_message_text("🗑️ Borrado.")
         except Exception:
             logger.exception("Error borrando %s %s", tipo, entidad_id)
@@ -138,16 +155,17 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 
 async def voz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if await _bloquear_no_autorizado(update):
+    user_id = await _resolver_o_bloquear(update)
+    if user_id is None:
         return
     await update.effective_chat.send_action(ChatAction.TYPING)
     try:
         media = update.message.voice or update.message.audio
         archivo = await media.get_file()
         audio = bytes(await archivo.download_as_bytearray())
-        transcrito = await _client.transcribe(audio)
+        transcrito = await _client.transcribe(audio, tenant_user=user_id)
         await update.message.reply_text(f"🎙️ _{transcrito}_", parse_mode="Markdown")
-        await _procesar(update, context, transcrito)
+        await _procesar(update, context, transcrito, user_id)
     except Exception:
         logger.exception("Error procesando audio")
         await update.message.reply_text("Ups, no pude procesar el audio.")

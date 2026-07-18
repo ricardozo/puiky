@@ -31,7 +31,8 @@ services:
       retries: 10
     # Sin `ports`: la BD no se expone fuera de la red del stack.
 
-  # One-shot: aplica migraciones y termina. La app espera a que complete.
+  # One-shot: migra control (public) + dominio de cada inquilino, y termina.
+  # La app espera a que complete.
   migrate:
     build: ./backend
     env_file: .env
@@ -41,7 +42,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: ["alembic", "upgrade", "head"]
+    command: ["python", "-m", "app.migrate_all"]
     restart: "no"
 
   app:

@@ -32,31 +32,48 @@ class PuikyClient:
             {"Authorization": f"Bearer {service_token}"} if service_token else {}
         )
 
-    async def interpret(self, texto: str, historial: list | None = None) -> dict:
+    def _hdr(self, tenant_user: str | None) -> dict:
+        """Cabeceras con el token de servicio + el inquilino a operar.
+
+        El backend acota la sesión al schema de ese usuario (`X-Tenant-User`)."""
+        h = dict(self._headers)
+        if tenant_user:
+            h["X-Tenant-User"] = tenant_user
+        return h
+
+    async def interpret(
+        self, texto: str, historial: list | None = None, tenant_user: str | None = None
+    ) -> dict:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as c:
             r = await c.post(
                 f"{self._base}/nlu/interpret",
                 json={"texto": texto, "historial": historial or []},
-                headers=self._headers,
+                headers=self._hdr(tenant_user),
             )
             r.raise_for_status()
             return r.json()
 
-    async def transcribe(self, audio: bytes, filename: str = "voz.ogg") -> str:
+    async def transcribe(
+        self, audio: bytes, filename: str = "voz.ogg", tenant_user: str | None = None
+    ) -> str:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as c:
             files = {"file": (filename, audio, "audio/ogg")}
             r = await c.post(
-                f"{self._base}/nlu/transcribe", files=files, headers=self._headers
+                f"{self._base}/nlu/transcribe",
+                files=files,
+                headers=self._hdr(tenant_user),
             )
             r.raise_for_status()
             return r.json().get("texto", "")
 
-    async def delete_entity(self, tipo: str, entidad_id: str) -> None:
+    async def delete_entity(
+        self, tipo: str, entidad_id: str, tenant_user: str | None = None
+    ) -> None:
         base = _RUTAS.get(tipo)
         if base is None:
             raise ValueError(f"Tipo no borrable: {tipo}")
         async with httpx.AsyncClient(timeout=_TIMEOUT) as c:
             r = await c.delete(
-                f"{self._base}{base}/{entidad_id}", headers=self._headers
+                f"{self._base}{base}/{entidad_id}", headers=self._hdr(tenant_user)
             )
             r.raise_for_status()

@@ -29,11 +29,10 @@ def main() -> None:
     settings = get_settings()
     if not settings.telegram_bot_token:
         raise SystemExit("Falta TELEGRAM_BOT_TOKEN en el entorno.")
-    if not settings.allowed_ids:
-        logger.warning(
-            "TELEGRAM_ALLOWED_IDS vacío: nadie está autorizado todavía. "
-            "Mándale un mensaje al bot y te responderá con tu ID para agregarlo."
-        )
+
+    # La autorización ya no es por allowlist en .env, sino por la tabla
+    # public.telegram_link (enlace telegram_id → usuario). Alta con:
+    #   python -m app.link_telegram <usuario> <telegram_id>
 
     app = Application.builder().token(settings.telegram_bot_token).build()
     app.add_handler(CommandHandler("start", handlers.start))

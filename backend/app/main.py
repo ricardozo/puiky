@@ -3,8 +3,8 @@
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.auth.deps import require_auth
 from app.config import get_settings
+from app.tenancy import get_tenant_db
 from app.routers import (
     auth,
     finances,
@@ -42,8 +42,11 @@ def health() -> dict[str, str]:
 # Público: login. (/auth/me se protege por su propia dependencia.)
 app.include_router(auth.router)
 
-# Todos los dominios requieren autenticación (usuario web o token de servicio).
-_protegido = [Depends(require_auth)]
+# Todos los dominios pasan por get_tenant_db: autentica (usuario web o token de
+# servicio + X-Tenant-User) y acota la sesión al schema del inquilino. Se monta
+# a nivel de router para cubrir también rutas sin `db` (p. ej. transcribir);
+# FastAPI cachea la dependencia, así que es una sola sesión por petición.
+_protegido = [Depends(get_tenant_db)]
 app.include_router(notes.router, dependencies=_protegido)
 app.include_router(notebooks.router, dependencies=_protegido)
 app.include_router(portfolios.router, dependencies=_protegido)

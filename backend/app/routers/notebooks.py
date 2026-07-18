@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.tenancy import get_tenant_db as get_db
 from app.schemas.notebooks import NotebookCreate, NotebookOut, NotebookUpdate
 from app.services import notebooks as service
 

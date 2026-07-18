@@ -1,0 +1,100 @@
+"""Aprovisionamiento de inquilinos y usuarios (schema-per-tenant).
+
+Crea el schema del inquilino, corre las migraciones de dominio dentro de él y
+da de alta el usuario web en `public.app_user`. También enlaza cuentas de
+Telegram (`public.telegram_link`).
+
+Usado por los CLIs `app.create_user` y `app.link_telegram`, y por el script
+`crear-usuario.sh`.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+from argparse import Namespace
+
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import text
+
+from app.auth.security import hash_password
+from app.database import SessionLocal, engine
+from app.models.users import TelegramLink, User
+
+_ALEMBIC_INI = os.path.join(os.path.dirname(os.path.dirname(__file__)), "alembic.ini")
+_SLUG_RE = re.compile(r"^[a-z0-9_]{1,50}$")
+
+
+def slug_a_schema(slug: str) -> str:
+    if not _SLUG_RE.match(slug):
+        raise ValueError(
+            "Slug inválido: usa minúsculas, números y guion bajo (máx 50)."
+        )
+    return f"t_{slug}"
+
+
+def _cfg(xargs: list[str]) -> Config:
+    cfg = Config(_ALEMBIC_INI)
+    cfg.cmd_opts = Namespace(x=xargs)  # env.py lee context.get_x_argument()
+    return cfg
+
+
+def upgrade_control() -> None:
+    """Aplica la cadena de control (public). Idempotente."""
+    command.upgrade(_cfg(["control=1"]), "control@head")
+
+
+def upgrade_tenant(schema: str) -> None:
+    """Aplica las migraciones de dominio dentro del schema del inquilino."""
+    command.upgrade(_cfg([f"tenant={schema}"]), "domain@head")
+
+
+def provision_tenant(slug: str) -> str:
+    """Crea el schema del inquilino (si falta) y lo migra a head. Devuelve el
+    nombre del schema."""
+    schema = slug_a_schema(slug)
+    with engine.connect() as c:
+        c.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
+        c.commit()
+    upgrade_tenant(schema)
+    return schema
+
+
+def crear_usuario(usuario: str, password: str, slug: str) -> tuple[str, str]:
+    """Provisiona el inquilino y crea/actualiza el usuario web. Devuelve
+    (schema, 'creado'|'actualizado')."""
+    schema = provision_tenant(slug)
+    with SessionLocal() as db:
+        db.execute(text("SET search_path TO public"))
+        user = db.query(User).filter_by(usuario=usuario).first()
+        if user is not None:
+            user.password_hash = hash_password(password)
+            accion = "actualizado"
+        else:
+            db.add(
+                User(
+                    usuario=usuario,
+                    password_hash=hash_password(password),
+                    tenant_schema=schema,
+                )
+            )
+            accion = "creado"
+        db.commit()
+    return schema, accion
+
+
+def link_telegram(usuario: str, telegram_id: int) -> None:
+    """Enlaza un ID de Telegram a un usuario (para que el bot lo reconozca)."""
+    with SessionLocal() as db:
+        db.execute(text("SET search_path TO public"))
+        user = db.query(User).filter_by(usuario=usuario).first()
+        if user is None:
+            raise ValueError(f"El usuario '{usuario}' no existe.")
+        link = db.get(TelegramLink, telegram_id)
+        if link is not None:
+            link.user_id = user.id
+            link.activo = True
+        else:
+            db.add(TelegramLink(telegram_id=telegram_id, user_id=user.id))
+        db.commit()

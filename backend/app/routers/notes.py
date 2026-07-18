@@ -9,7 +9,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.tenancy import get_tenant_db as get_db
 from app.schemas.notes import (
     EntidadTipo,
     NoteAppend,
