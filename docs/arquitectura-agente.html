@@ -1,0 +1,385 @@
+<title>Puiky · Anatomía de un agente que fluye</title>
+<meta name="description" content="Cómo está construido Puiky y qué decisiones de diseño hacen que su asistente conversacional se sienta fluido." />
+<style>
+  :root {
+    --paper: #f6f4ee;
+    --ground: #efece4;
+    --card: #fffefb;
+    --ink: #191823;
+    --muted: #6d6a79;
+    --faint: #928f9e;
+    --line: #e3ded4;
+    --accent: #4b41c4;
+    --accent-soft: rgba(75, 65, 196, .09);
+    --gold: #a9821f;
+    --gold-soft: rgba(169, 130, 31, .12);
+    --danger: #a23a3a;
+    --shadow: 0 1px 2px rgba(25,24,35,.05), 0 8px 24px -12px rgba(25,24,35,.14);
+    --font-display: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #121118;
+      --ground: #16151d;
+      --card: #1c1b24;
+      --ink: #eceaf3;
+      --muted: #9d9aab;
+      --faint: #74717f;
+      --line: #2a2833;
+      --accent: #948dff;
+      --accent-soft: rgba(148, 141, 255, .14);
+      --gold: #d9b458;
+      --gold-soft: rgba(217, 180, 88, .14);
+      --danger: #e08a8a;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 32px -14px rgba(0,0,0,.55);
+    }
+  }
+  :root[data-theme="light"] {
+    --paper: #f6f4ee; --ground: #efece4; --card: #fffefb; --ink: #191823;
+    --muted: #6d6a79; --faint: #928f9e; --line: #e3ded4; --accent: #4b41c4;
+    --accent-soft: rgba(75,65,196,.09); --gold: #a9821f; --gold-soft: rgba(169,130,31,.12);
+    --danger: #a23a3a; --shadow: 0 1px 2px rgba(25,24,35,.05), 0 8px 24px -12px rgba(25,24,35,.14);
+  }
+  :root[data-theme="dark"] {
+    --paper: #121118; --ground: #16151d; --card: #1c1b24; --ink: #eceaf3;
+    --muted: #9d9aab; --faint: #74717f; --line: #2a2833; --accent: #948dff;
+    --accent-soft: rgba(148,141,255,.14); --gold: #d9b458; --gold-soft: rgba(217,180,88,.14);
+    --danger: #e08a8a; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 32px -14px rgba(0,0,0,.55);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: var(--font-body); line-height: 1.65;
+    -webkit-font-smoothing: antialiased; font-size: 17px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+  .eyebrow {
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--gold); font-weight: 600;
+  }
+  h1, h2, h3 { font-family: var(--font-display); font-weight: 600; text-wrap: balance; line-height: 1.15; }
+  a { color: var(--accent); }
+
+  /* Header */
+  header { border-bottom: 1px solid var(--line); background: var(--ground); }
+  .hero { padding: 68px 0 52px; }
+  .hero .kicker { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
+  .hero .kicker .dot { color: var(--gold); font-size: 20px; }
+  h1 { font-size: clamp(34px, 6vw, 52px); margin: 0 0 18px; letter-spacing: -.01em; }
+  h1 .flow { font-style: italic; color: var(--accent); }
+  .lede { font-size: clamp(18px, 2.3vw, 21px); color: var(--muted); max-width: 60ch; margin: 0; }
+  .thesis {
+    margin-top: 30px; padding: 18px 22px; border-left: 3px solid var(--gold);
+    background: var(--gold-soft); border-radius: 0 10px 10px 0; font-size: 16px;
+  }
+  .thesis strong { color: var(--ink); }
+
+  main { padding: 8px 0 80px; }
+  section { padding: 46px 0; border-bottom: 1px solid var(--line); }
+  section:last-child { border-bottom: 0; }
+  h2 { font-size: clamp(24px, 3.6vw, 30px); margin: 0 0 6px; letter-spacing: -.01em; }
+  .sec-note { color: var(--faint); font-size: 15px; margin: 0 0 26px; }
+  p { margin: 0 0 16px; }
+  .muted { color: var(--muted); }
+  code, .mono { font-family: var(--font-mono); font-size: .88em; }
+  p code, li code { background: var(--accent-soft); color: var(--accent); padding: 1px 6px; border-radius: 5px; }
+
+  /* Layered architecture diagram */
+  .stack { display: flex; flex-direction: column; gap: 10px; margin: 8px 0 4px; }
+  .layer {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 18px; box-shadow: var(--shadow); position: relative;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  .layer .lname {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--faint); min-width: 92px;
+  }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip {
+    font-size: 13.5px; font-weight: 500; padding: 5px 12px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent); border: 1px solid transparent;
+  }
+  .chip.plain { background: transparent; color: var(--ink); border-color: var(--line); }
+  .layer.spine { border-left: 3px solid var(--accent); }
+  .flowline { text-align: center; color: var(--faint); font-size: 15px; line-height: .6; }
+
+  /* Message flow */
+  ol.flow { list-style: none; counter-reset: step; margin: 0; padding: 0; }
+  ol.flow li {
+    counter-increment: step; position: relative; padding: 0 0 22px 52px; margin: 0;
+  }
+  ol.flow li::before {
+    content: counter(step); position: absolute; left: 0; top: -2px;
+    width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+    font-family: var(--font-mono); font-size: 14px; font-weight: 600;
+    color: var(--accent); background: var(--accent-soft); border: 1px solid var(--line);
+  }
+  ol.flow li::after {
+    content: ""; position: absolute; left: 15.5px; top: 32px; bottom: 4px;
+    width: 1px; background: var(--line);
+  }
+  ol.flow li:last-child { padding-bottom: 0; }
+  ol.flow li:last-child::after { display: none; }
+  ol.flow b { font-weight: 600; }
+  ol.flow .say { color: var(--muted); font-style: italic; }
+
+  /* The decisions — the centerpiece */
+  .decisions { display: flex; flex-direction: column; gap: 2px; }
+  .decision {
+    display: grid; grid-template-columns: 56px 1fr; gap: 4px 20px;
+    padding: 24px 0; border-top: 1px solid var(--line); align-items: start;
+  }
+  .decision:first-child { border-top: 0; }
+  .decision .num {
+    font-family: var(--font-display); font-size: 34px; color: var(--gold);
+    line-height: 1; font-weight: 600; grid-row: span 3;
+  }
+  .decision h3 { font-size: 20px; margin: 2px 0 8px; }
+  .decision .why { margin: 0 0 8px; }
+  .decision .anti {
+    margin: 0; font-size: 15px; color: var(--muted);
+    padding-left: 14px; border-left: 2px solid var(--danger);
+  }
+  .decision .anti b { color: var(--danger); font-weight: 600; }
+  .decision .where {
+    margin: 10px 0 0; font-family: var(--font-mono); font-size: 12.5px; color: var(--faint);
+  }
+
+  /* Checklist */
+  ul.check { list-style: none; margin: 0; padding: 0; }
+  ul.check li {
+    position: relative; padding: 9px 0 9px 34px; border-bottom: 1px solid var(--line);
+    font-size: 16px;
+  }
+  ul.check li:last-child { border-bottom: 0; }
+  ul.check li::before {
+    content: "→"; position: absolute; left: 4px; top: 9px; color: var(--gold); font-weight: 700;
+  }
+  ul.check b { font-weight: 600; }
+
+  /* Stack grid */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+  .cell {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 18px; box-shadow: var(--shadow);
+  }
+  .cell .k { font-family: var(--font-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--gold); }
+  .cell .v { margin-top: 6px; font-size: 15px; color: var(--ink); }
+  .cell .v span { color: var(--muted); }
+
+  .closer p { font-size: 18px; }
+  .closer .big { font-family: var(--font-display); font-size: clamp(20px, 3vw, 26px); color: var(--ink); line-height: 1.35; }
+  .closer .big em { color: var(--accent); font-style: italic; }
+
+  footer { padding: 30px 0 60px; color: var(--faint); font-size: 13.5px; }
+  footer .mono { color: var(--faint); }
+
+  /* Theme toggle */
+  .toggle {
+    position: fixed; top: 16px; right: 16px; z-index: 20;
+    background: var(--card); border: 1px solid var(--line); color: var(--muted);
+    width: 38px; height: 38px; border-radius: 10px; cursor: pointer; font-size: 16px;
+    box-shadow: var(--shadow); display: grid; place-items: center;
+  }
+  .toggle:hover { color: var(--ink); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+  @media (max-width: 520px) {
+    .decision { grid-template-columns: 1fr; gap: 6px; }
+    .decision .num { grid-row: auto; font-size: 28px; }
+  }
+</style>
+
+<button class="toggle" id="tg" aria-label="Cambiar tema">◑</button>
+
+<header>
+  <div class="wrap hero">
+    <div class="kicker"><span class="dot">◆</span><span class="eyebrow">Puiky · Nota de arquitectura</span></div>
+    <h1>Anatomía de un agente que <span class="flow">fluye</span></h1>
+    <p class="lede">Cómo está construido Puiky —un asistente personal por voz y texto— y, sobre todo, qué decisiones de diseño hacen que se sienta como hablarle a alguien, y no como llenar un formulario.</p>
+    <div class="thesis">La fluidez no viene del modelo. Viene de <strong>cómo se le da el contexto, cómo se resuelven las referencias, y cómo se manejan el error y la memoria.</strong> Diez decisiones, no un modelo más grande.</div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section>
+    <span class="eyebrow">La forma</span>
+    <h2>Cuatro capas, una sola lógica</h2>
+    <p class="sec-note">El canal y el modelo son reemplazables sin tocar el resto. La lógica de negocio vive en un solo lugar.</p>
+    <div class="stack">
+      <div class="layer">
+        <span class="lname">Canales</span>
+        <div class="chips"><span class="chip">Bot de Telegram · texto y voz</span><span class="chip">Web React · login JWT</span></div>
+      </div>
+      <div class="flowline">↓</div>
+      <div class="layer spine">
+        <span class="lname">NLU</span>
+        <div class="chips"><span class="chip">Orquestador</span><span class="chip">Tools</span><span class="chip">LLMProvider · Qwen/fake</span><span class="chip">Whisper</span></div>
+      </div>
+      <div class="flowline">↓</div>
+      <div class="layer">
+        <span class="lname">Negocio</span>
+        <div class="chips"><span class="chip plain">API REST · FastAPI + Auth</span><span class="chip plain">Servicios (lógica)</span></div>
+      </div>
+      <div class="flowline">↓</div>
+      <div class="layer">
+        <span class="lname">Datos</span>
+        <div class="chips"><span class="chip plain">Postgres + pgvector</span><span class="chip plain">Scheduler · avisos proactivos</span></div>
+      </div>
+    </div>
+    <p class="muted" style="margin-top:22px">La API web, las <em>tools</em> del bot y el scheduler usan <b>los mismos servicios</b>. Nada de lógica duplicada por canal — por eso Telegram y la web operan idénticos sobre los mismos datos.</p>
+  </section>
+
+  <section>
+    <span class="eyebrow">El recorrido</span>
+    <h2>De una frase a una acción</h2>
+    <p class="sec-note">Ejemplo real: <span class="mono">"gasté 20 mil en mercado con efectivo"</span></p>
+    <ol class="flow">
+      <li><b>El bot recibe</b> el mensaje (si es voz, Whisper lo transcribe primero) y llama a <code>interpret(texto, historial)</code>.</li>
+      <li><b>Se arma el prompt:</b> sistema + contexto (fecha, categorías, cuentas…) + memoria de la conversación + el mensaje + las herramientas disponibles.</li>
+      <li><b>El modelo decide:</b> emite un <i>tool call</i> → <span class="say">registrar_gasto(20000, "mercado", "efectivo")</span>.</li>
+      <li><b>Se ejecuta:</b> la tool resuelve <b>"mercado" → categoría Comida</b> y <b>"efectivo" → la cuenta</b>, y registra el gasto (actualiza el saldo).</li>
+      <li><b>Segunda pasada, sin tools:</b> se le devuelve el resultado real para que redacte la confirmación.</li>
+      <li><b>Responde:</b> <span class="say">"Registré 20.000 en Comida. Tu saldo es 80.000."</span> Si fuera un borrado, aparecen botones Sí / Cancelar.</li>
+    </ol>
+  </section>
+
+  <section>
+    <span class="eyebrow">El núcleo · lo que hay que aprender</span>
+    <h2>Diez decisiones que dan fluidez</h2>
+    <p class="sec-note">Un agente <em>funciona</em> con solo exponer funciones. Se siente <em>fluido</em> por esto. Cada punto trae el anti‑patrón que evita.</p>
+    <div class="decisions">
+
+      <div class="decision">
+        <div class="num">1</div>
+        <h3>Tools = intenciones, no un CRUD genérico</h3>
+        <p class="why">Cada herramienta es un verbo con significado (<code>registrar_gasto</code>, <code>anadir_a_hoja</code>, <code>cumplir_responsabilidad</code>), no <span class="mono">insertar_fila(tabla, datos)</span>. El modelo elige mucho mejor entre verbos claros, y cada tool encapsula sus reglas.</p>
+        <p class="anti"><b>Anti‑patrón:</b> exponer la base cruda o un único "ejecutar_sql". El modelo se pierde y hace cosas peligrosas.</p>
+      </div>
+
+      <div class="decision">
+        <div class="num">2</div>
+        <h3>Referencias por nombre, nunca por ID</h3>
+        <p class="why">El usuario dice "la tarea del informe", "la cuenta de ahorros". Las tools <b>resuelven</b> eso a un id internamente (por coincidencia de nombre o por búsqueda semántica), y si hay ambigüedad <b>preguntan cuál</b>.</p>
+        <p class="anti"><b>Anti‑patrón:</b> que la tool pida un UUID. Nadie los tiene a mano; el modelo los inventa o falla. Es lo que más rompe un agente.</p>
+      </div>
+
+      <div class="decision">
+        <div class="num">3</div>
+        <h3>Inyecta el contexto en el prompt</h3>
+        <p class="why">Antes de cada interpretación, el prompt incluye la fecha/hora y las listas de <b>lo que existe</b>: cuadernos, portafolios, categorías, cuentas, proyectos. Así mapea "mercado"→Comida y "mañana"→fecha ISO sin preguntar.</p>
+        <p class="anti"><b>Anti‑patrón:</b> un prompt estático. El modelo no sabe qué existe, así que pregunta todo o inventa nombres.</p>
+      </div>
+
+      <div class="decision">
+        <div class="num">4</div>
+        <h3>Dale memoria de conversación</h3>
+        <p class="why">El bot guarda los últimos turnos por chat y los envía en cada petición. Cuando el agente pregunta "¿cuál de los dos ítems?", la respuesta del usuario <b>tiene contexto</b>.</p>
+        <p class="anti"><b>Anti‑patrón:</b> agente sin estado. Cada mensaje se interpreta de cero; "bórralo" se rutea a la cosa equivocada. Mata cualquier diálogo de dos pasos.</p>
+      </div>
+
+      <div class="decision">
+        <div class="num">5</div>
+        <h3>Los errores son datos, no excepciones</h3>
+        <p class="why">Si una tool falla, devuelve <span class="mono">{ ok: false, error: … }</span> en vez de reventar. El modelo <b>lee ese error</b> y lo explica ("no encontré esa categoría, ¿la creo?") o pide el dato que falta.</p>
+        <p class="anti"><b>Anti‑patrón:</b> dejar que una excepción mate el turno y devuelva un "error 500" al usuario.</p>
+      </div>
+
+      <div class="decision">
+        <div class="num">6</div>
+        <h3>Confirma lo destructivo fuera del modelo</h3>
+        <p class="why">Las tools de borrado <b>no borran</b>: piden confirmación. El bot muestra botones <b>Sí / Cancelar</b>; solo al tocar "Sí" se borra, vía la API — no vía el modelo.</p>
+        <p class="anti"><b>Anti‑patrón:</b> que un LLM borre datos por su cuenta a partir de una frase ambigua.</p>
+      </div>
+
+      <div class="decision">
+        <div class="num">7</div>
+        <h3>Abstrae el modelo (real / fake)</h3>
+        <p class="why">El proveedor de LLM es una interfaz con dos implementaciones: <b>real</b> (Qwen vía Ollama) y <b>fake</b> (determinista, por reglas). Igual para voz y embeddings. Se desarrolla y testea sin el modelo, y se cambia con una variable de entorno.</p>
+        <p class="anti"><b>Anti‑patrón:</b> acoplar todo el código a un SDK o modelo concreto.</p>
+      </div>
+
+      <div class="decision">
+        <div class="num">8</div>
+        <h3>Una ronda de tools + respuesta con datos reales</h3>
+        <p class="why">El orquestador pide qué hacer, ejecuta las tools (varias, si hay multi‑intención) y hace una segunda llamada <b>sin tools</b> solo para redactar con los resultados reales (saldos, ids), no con lo que el modelo "cree".</p>
+        <p class="anti"><b>Anti‑patrón:</b> dejar al modelo iterar sin límite, o narrar sin ver lo que de verdad pasó.</p>
+      </div>
+
+      <div class="decision">
+        <div class="num">9</div>
+        <h3>No preguntes lo que ya se dijo</h3>
+        <p class="why">Se le instruye explícitamente a deducir del contexto y no re‑preguntar datos ya presentes. Combinado con la memoria (4) y el contexto (3), casi nunca pide algo dos veces.</p>
+        <p class="anti"><b>Anti‑patrón:</b> un interrogatorio: "¿de qué cuenta?" cuando el usuario ya dijo "con efectivo".</p>
+      </div>
+
+      <div class="decision">
+        <div class="num">10</div>
+        <h3>Responde breve y confirma lo hecho</h3>
+        <p class="why">Respuestas cortas, en el idioma del usuario, que confirman la acción concreta ("Registré…", "Listo, moví…"). El tono es de asistente, no de sistema.</p>
+        <p class="anti"><b>Anti‑patrón:</b> párrafos genéricos que no dicen si algo pasó de verdad.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">Para replicar</span>
+    <h2>La receta, en una lista</h2>
+    <ul class="check">
+      <li><b>Verbos, no CRUD.</b> Define tools por intención del usuario.</li>
+      <li><b>Resuelve referencias</b> por nombre o significado. Nunca pidas IDs.</li>
+      <li><b>Desambigua:</b> si hay varios candidatos, pregunta cuál.</li>
+      <li><b>Inyecta contexto</b> — la fecha y los nombres de sus cosas — en el prompt.</li>
+      <li><b>Da memoria</b> de conversación, aunque sean pocos turnos.</li>
+      <li><b>Errores como datos</b>, no como excepciones.</li>
+      <li><b>Confirma lo destructivo</b> fuera del modelo.</li>
+      <li><b>Una ronda de tools</b> + respuesta con resultados reales.</li>
+      <li><b>Abstrae el modelo</b> con una interfaz y un doble "fake".</li>
+      <li><b>Sé breve</b> y no preguntes lo que ya se dijo.</li>
+    </ul>
+  </section>
+
+  <section>
+    <span class="eyebrow">El material</span>
+    <h2>Stack e infraestructura</h2>
+    <div class="grid">
+      <div class="cell"><div class="k">Backend / NLU</div><div class="v">Python · FastAPI · SQLAlchemy <span>· Alembic, uv</span></div></div>
+      <div class="cell"><div class="k">Datos</div><div class="v">Postgres + pgvector <span>· e5-base, 768 dims</span></div></div>
+      <div class="cell"><div class="k">Modelo</div><div class="v">Qwen3 14B local <span>· Ollama (OpenAI-compat)</span></div></div>
+      <div class="cell"><div class="k">Voz</div><div class="v">Whisper <span>· transcripción local</span></div></div>
+      <div class="cell"><div class="k">Canal</div><div class="v">Telegram <span>· long-polling, sin puertos abiertos</span></div></div>
+      <div class="cell"><div class="k">Web</div><div class="v">React · Vite · TS · Tailwind <span>· JWT</span></div></div>
+      <div class="cell"><div class="k">Despliegue</div><div class="v">Docker Compose <span>· dev Windows → prod Ubuntu, idéntico</span></div></div>
+      <div class="cell"><div class="k">Seguridad</div><div class="v">JWT (web) + token de servicio (bot) <span>· allowlist</span></div></div>
+    </div>
+  </section>
+
+  <section class="closer">
+    <span class="eyebrow">En resumen</span>
+    <h2>Por qué "el otro agente" no fluye igual</h2>
+    <p class="muted">Cuando un agente parecido se siente rígido, casi siempre falta uno de estos: pide IDs o datos que el usuario no tiene (2, 3); es <em>stateless</em> y pierde el hilo (4); sus tools son genéricas o mal descritas (1); revienta ante un fallo (5); o el prompt no le dice qué existe (3).</p>
+    <p class="big">La inteligencia estaba disponible todo el tiempo. Lo que faltaba era <em>darle el mundo del usuario</em>: sus nombres, su fecha, su conversación, y una forma segura de actuar.</p>
+  </section>
+
+</main>
+
+<footer class="wrap">
+  <span class="mono">Puiky · del muisca <i>pquyquy</i>: corazón, mente y memoria.</span>
+</footer>
+
+<script>
+  (function () {
+    var tg = document.getElementById('tg');
+    var root = document.documentElement;
+    tg.addEventListener('click', function () {
+      var cur = root.getAttribute('data-theme');
+      if (!cur) cur = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      root.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+    });
+  })();
+</script>
