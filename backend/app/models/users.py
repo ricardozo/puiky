@@ -45,6 +45,13 @@ class User(ControlBase):
     activo: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("true")
     )
+    # Código de un solo uso para auto-vincular Telegram (/vincular <código>).
+    enroll_code: Mapped[str | None] = mapped_column(
+        String(16), unique=True, nullable=True
+    )
+    enroll_expira: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     creado: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

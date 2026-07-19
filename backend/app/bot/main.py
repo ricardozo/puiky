@@ -36,6 +36,7 @@ def main() -> None:
 
     app = Application.builder().token(settings.telegram_bot_token).build()
     app.add_handler(CommandHandler("start", handlers.start))
+    app.add_handler(CommandHandler("vincular", handlers.vincular))
     app.add_handler(CallbackQueryHandler(handlers.on_callback))
     app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handlers.voz))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handlers.texto))

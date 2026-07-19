@@ -19,6 +19,7 @@ from app.bot.client import PuikyClient
 from app.config import get_settings
 from app.database import SessionLocal
 from app.models.users import TelegramLink
+from app.provision import vincular_por_codigo
 
 logger = logging.getLogger("puiky.bot")
 
@@ -54,12 +55,35 @@ async def _resolver_o_bloquear(update: Update) -> str | None:
     if user_id is None:
         if update.message:
             await update.message.reply_text(
-                "No estás autorizado para usar este bot.\n"
-                f"Tu ID de Telegram es: {uid}\n"
-                "Pídele al administrador que te dé de alta con ese ID."
+                "Aún no estás activado en Puiky.\n"
+                "Si ya tienes usuario, envía tu código:  /vincular <código>\n"
+                f"(Tu ID de Telegram es: {uid})"
             )
         logger.info("Mensaje de ID no enlazado: %s", uid)
     return user_id
+
+
+async def vincular(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Auto-vinculación con un código de un solo uso: /vincular <código>."""
+    uid = update.effective_user.id if update.effective_user else None
+    if resolver_user_id(uid) is not None:
+        await update.message.reply_text("Ya estás activado 🙂")
+        return
+    args = context.args
+    if not args:
+        await update.message.reply_text(
+            "Para activarte, envía tu código:  /vincular <código>\n"
+            "(te lo da quien administra Puiky)."
+        )
+        return
+    if uid is not None and vincular_por_codigo(uid, args[0].strip()):
+        await update.message.reply_text(
+            "✅ ¡Listo! Ya puedes usar Puiky. Escríbeme lo que necesites."
+        )
+    else:
+        await update.message.reply_text(
+            "Ese código no es válido o ya venció. Pide uno nuevo."
+        )
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

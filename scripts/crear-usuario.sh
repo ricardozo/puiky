@@ -21,16 +21,17 @@ read -rsp "Contraseña web: " PASS; echo
 read -rp "ID de Telegram (opcional, Enter para omitir): " TGID
 
 echo "-> Creando usuario '$USUARIO' e inquilino t_$SLUG…"
+# Imprime también el código de vinculación de Telegram (/vincular <código>).
 dc exec -T app python -m app.create_user "$USUARIO" "$PASS" "$SLUG"
 
 if [[ -n "$TGID" ]]; then
-  echo "-> Enlazando Telegram $TGID…"
+  echo "-> Enlazando Telegram $TGID directamente…"
   dc exec -T app python -m app.link_telegram "$USUARIO" "$TGID"
 fi
 
 cat <<EOF
 
 == Usuario '$USUARIO' listo ==
-  Web:  puede entrar en la misma URL de Puiky con su usuario y contraseña.
-  Bot:  $( [[ -n "$TGID" ]] && echo "ya enlazado; puede escribirle al bot." || echo "sin Telegram; enlázalo luego con app.link_telegram." )
+  Web:  entra en la misma URL de Puiky con su usuario y contraseña.
+  Bot:  $( [[ -n "$TGID" ]] && echo "Telegram ya enlazado; puede escribirle al bot." || echo "pásale el CÓDIGO de arriba; ella le escribe al bot: /vincular <código>." )
 EOF

@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import os
 import re
+import secrets
 from argparse import Namespace
+from datetime import datetime, timedelta, timezone
 
 from alembic import command
 from alembic.config import Config
@@ -24,6 +26,7 @@ from app.models.users import TelegramLink, User
 
 _ALEMBIC_INI = os.path.join(os.path.dirname(os.path.dirname(__file__)), "alembic.ini")
 _SLUG_RE = re.compile(r"^[a-z0-9_]{1,50}$")
+_CODIGO_HORAS = 168  # el código de vinculación vive 7 días
 
 
 def slug_a_schema(slug: str) -> str:
@@ -61,10 +64,17 @@ def provision_tenant(slug: str) -> str:
     return schema
 
 
-def crear_usuario(usuario: str, password: str, slug: str) -> tuple[str, str]:
-    """Provisiona el inquilino y crea/actualiza el usuario web. Devuelve
-    (schema, 'creado'|'actualizado')."""
+def _nuevo_codigo() -> tuple[str, datetime]:
+    return secrets.token_hex(4), datetime.now(timezone.utc) + timedelta(
+        hours=_CODIGO_HORAS
+    )
+
+
+def crear_usuario(usuario: str, password: str, slug: str) -> tuple[str, str, str]:
+    """Provisiona el inquilino, crea/actualiza el usuario web y le genera un
+    código de vinculación de Telegram. Devuelve (schema, accion, codigo)."""
     schema = provision_tenant(slug)
+    code, expira = _nuevo_codigo()
     with SessionLocal() as db:
         db.execute(text("SET search_path TO public"))
         user = db.query(User).filter_by(usuario=usuario).first()
@@ -72,16 +82,55 @@ def crear_usuario(usuario: str, password: str, slug: str) -> tuple[str, str]:
             user.password_hash = hash_password(password)
             accion = "actualizado"
         else:
-            db.add(
-                User(
-                    usuario=usuario,
-                    password_hash=hash_password(password),
-                    tenant_schema=schema,
-                )
+            user = User(
+                usuario=usuario,
+                password_hash=hash_password(password),
+                tenant_schema=schema,
             )
+            db.add(user)
             accion = "creado"
+        user.enroll_code = code
+        user.enroll_expira = expira
         db.commit()
-    return schema, accion
+    return schema, accion, code
+
+
+def generar_codigo(usuario: str) -> str:
+    """Regenera el código de vinculación de un usuario existente."""
+    code, expira = _nuevo_codigo()
+    with SessionLocal() as db:
+        db.execute(text("SET search_path TO public"))
+        user = db.query(User).filter_by(usuario=usuario).first()
+        if user is None:
+            raise ValueError(f"El usuario '{usuario}' no existe.")
+        user.enroll_code = code
+        user.enroll_expira = expira
+        db.commit()
+    return code
+
+
+def vincular_por_codigo(telegram_id: int, code: str) -> bool:
+    """Enlaza un Telegram a un usuario si el código es válido y no venció.
+    Consume el código (un solo uso). Devuelve True si vinculó."""
+    with SessionLocal() as db:
+        db.execute(text("SET search_path TO public"))
+        user = db.query(User).filter_by(enroll_code=code).first()
+        if user is None or not user.activo:
+            return False
+        if user.enroll_expira is None or user.enroll_expira < datetime.now(
+            timezone.utc
+        ):
+            return False
+        link = db.get(TelegramLink, telegram_id)
+        if link is not None:
+            link.user_id = user.id
+            link.activo = True
+        else:
+            db.add(TelegramLink(telegram_id=telegram_id, user_id=user.id))
+        user.enroll_code = None  # consumir
+        user.enroll_expira = None
+        db.commit()
+        return True
 
 
 def link_telegram(usuario: str, telegram_id: int) -> None:
