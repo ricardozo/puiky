@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.finances import Account, Category
+from app.models.market import MarketProduct
 from app.models.notebooks import Notebook
 from app.models.portfolios import Portfolio
 from app.models.projects import Project
@@ -62,6 +63,14 @@ def _system_prompt(db: Session) -> str:
         pf.nombre
         for pf in db.execute(select(Portfolio).order_by(Portfolio.nombre)).scalars()
     ]
+    productos = [
+        p.nombre
+        for p in db.execute(
+            select(MarketProduct)
+            .where(MarketProduct.activo.is_(True))
+            .order_by(MarketProduct.nombre)
+        ).scalars()
+    ]
     return (
         "Eres Puiky, un asistente personal (un 'segundo cerebro'). Interpretas lo "
         "que dice el usuario y usas las herramientas para actuar.\n"
@@ -77,6 +86,9 @@ def _system_prompt(db: Session) -> str:
         f"- Cuentas: {', '.join(cuentas) or '(ninguna)'}. Úsalas sin preguntar.\n"
         f"- Portafolios: {', '.join(portafolios) or '(ninguno)'} (agrupan proyectos).\n"
         f"- Proyectos activos: {', '.join(proyectos) or '(ninguno)'}.\n"
+        f"- Productos de mercado: {', '.join(productos) or '(ninguno)'}. Para "
+        "«compré X» usa registrar_compra_mercado; para «¿qué me toca comprar?» "
+        "usa que_toca_comprar.\n"
         "- Pide un dato solo si de verdad falta; no preguntes por algo ya dicho.\n"
         "- Puedes ejecutar varias acciones si el usuario menciona varias.\n"
         "- Responde en español, breve y natural, confirmando lo hecho."

@@ -16,6 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.finances import Account, Budget, Category, Transaction
+from app.models.market import MarketProduct
 from app.models.notebooks import Notebook
 from app.models.notes import Note
 from app.models.portfolios import Portfolio
@@ -30,6 +31,7 @@ from app.schemas.finances import (
     TransactionCreate,
     TransactionTipo,
 )
+from app.schemas.market import ProductCreate, PurchaseCreate
 from app.schemas.notebooks import NotebookCreate
 from app.schemas.notes import NoteCreate, NoteLinkCreate, NoteUpdate
 from app.schemas.portfolios import PortfolioCreate
@@ -44,6 +46,7 @@ from app.schemas.tasks import (
     TaskUpdate,
 )
 from app.services import finances as fin
+from app.services import market as market_svc
 from app.services import notebooks as nb_svc
 from app.services import notes as notes_svc
 from app.services import portfolios as pf_svc
@@ -81,6 +84,10 @@ def _resolver(db: Session, modelo, columna, ref: str, etiqueta: str):
 
 def _resolver_cuenta(db: Session, ref: str) -> Account:
     return _resolver(db, Account, Account.nombre, ref, "una cuenta")
+
+
+def _resolver_producto(db: Session, ref: str) -> MarketProduct:
+    return _resolver(db, MarketProduct, MarketProduct.nombre, ref, "un producto")
 
 
 def _resolver_categoria(db: Session, ref: str) -> Category:
@@ -830,6 +837,68 @@ def _eliminar_recordatorio(db: Session, a: dict) -> dict:
 # --- Registro de tools ---
 
 
+# --- Lista de mercado ---
+
+
+def _crear_producto_mercado(db: Session, a: dict) -> dict:
+    cat = a.get("categoria")
+    category_id = _resolver_categoria(db, cat).id if cat else None
+    cad = a.get("cadencia_dias")
+    p = market_svc.create_product(
+        db,
+        ProductCreate(
+            nombre=a["nombre"],
+            unidad=(a.get("unidad") or "unidad"),
+            cadencia_dias=int(cad) if cad else None,
+            category_id=category_id,
+        ),
+    )
+    return {"ok": True, "producto": p.nombre, "cadencia_dias": p.cadencia_dias}
+
+
+def _registrar_compra_mercado(db: Session, a: dict) -> dict:
+    p = _resolver_producto(db, a["producto"])
+    market_svc.register_purchase(
+        db,
+        p.id,
+        PurchaseCreate(cantidad=a.get("cantidad") or 1, precio=a.get("precio")),
+    )
+    return {"ok": True, "producto": p.nombre}
+
+
+def _que_toca_comprar(db: Session, a: dict) -> dict:
+    pend = market_svc.por_comprar(db)
+    return {
+        "ok": True,
+        "por_comprar": [
+            {
+                "producto": p.nombre,
+                "dias_desde": p.dias_desde,  # type: ignore[attr-defined]
+                "cadencia_dias": p.cadencia_dias,
+            }
+            for p in pend
+        ],
+    }
+
+
+def _listar_productos_mercado(db: Session, a: dict) -> dict:
+    prods = market_svc.list_products(db)
+    return {
+        "ok": True,
+        "productos": [
+            {
+                "producto": p.nombre,
+                "cadencia_dias": p.cadencia_dias,
+                "ultima_compra": (
+                    p.ultima_compra.isoformat() if p.ultima_compra else None  # type: ignore[attr-defined]
+                ),
+                "por_comprar": p.por_comprar,  # type: ignore[attr-defined]
+            }
+            for p in prods
+        ],
+    }
+
+
 def _p(props: dict, required: list[str]) -> dict:
     return {"type": "object", "properties": props, "required": required}
 
@@ -1228,6 +1297,35 @@ TOOLS: list[Tool] = [
         "Elimina un recordatorio (por su texto). Pide confirmación.",
         _p({"recordatorio": _STR}, ["recordatorio"]),
         _eliminar_recordatorio,
+    ),
+    Tool(
+        "crear_producto_mercado",
+        "Agrega un producto a la lista de mercado. `cadencia_dias`: cada cuántos "
+        "días se compra (opcional). `unidad`: unidad|g|kg|ml|l. `categoria`: opcional.",
+        _p(
+            {"nombre": _STR, "cadencia_dias": _NUM, "unidad": _STR, "categoria": _STR},
+            ["nombre"],
+        ),
+        _crear_producto_mercado,
+    ),
+    Tool(
+        "registrar_compra_mercado",
+        "Registra que se compró un producto de la lista (reinicia su ciclo de "
+        "recompra). `producto` es el nombre.",
+        _p({"producto": _STR, "cantidad": _NUM, "precio": _NUM}, ["producto"]),
+        _registrar_compra_mercado,
+    ),
+    Tool(
+        "que_toca_comprar",
+        "Lista los productos de mercado que ya toca reponer (por su cadencia).",
+        _p({}, []),
+        _que_toca_comprar,
+    ),
+    Tool(
+        "listar_productos_mercado",
+        "Lista los productos de la lista de mercado con su estado.",
+        _p({}, []),
+        _listar_productos_mercado,
     ),
 ]
 

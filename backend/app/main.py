@@ -8,6 +8,7 @@ from app.tenancy import get_tenant_db
 from app.routers import (
     auth,
     finances,
+    market,
     nlu,
     notebooks,
     notes,
@@ -58,4 +59,5 @@ app.include_router(finances.categories_router, dependencies=_protegido)
 app.include_router(finances.transactions_router, dependencies=_protegido)
 app.include_router(finances.budgets_router, dependencies=_protegido)
 app.include_router(reminders.router, dependencies=_protegido)
+app.include_router(market.router, dependencies=_protegido)
 app.include_router(nlu.router, dependencies=_protegido)

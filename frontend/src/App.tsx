@@ -12,6 +12,7 @@ import Recordatorios from './pages/Recordatorios'
 import Responsabilidades from './pages/Responsabilidades'
 import Tareas from './pages/Tareas'
 import Concepto from './pages/Concepto'
+import Mercado from './pages/Mercado'
 
 export default function App() {
   const { usuario, loading } = useAuth()
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="proyectos/:id" element={<Board />} />
         <Route path="tareas" element={<Tareas />} />
         <Route path="finanzas" element={<Finanzas />} />
+        <Route path="mercado" element={<Mercado />} />
         <Route path="responsabilidades" element={<Responsabilidades />} />
         <Route path="recordatorios" element={<Recordatorios />} />
         <Route path="concepto" element={<Concepto />} />
