@@ -399,10 +399,13 @@ export const api = {
     }),
   deleteMarketProduct: (id: string) =>
     request<void>(`/market/products/${id}`, { method: 'DELETE' }),
-  registrarCompra: (id: string) =>
+  registrarCompra: (
+    id: string,
+    data?: { cantidad?: number; precio?: number | null; fecha?: string }
+  ) =>
     request<unknown>(`/market/products/${id}/compras`, {
       method: 'POST',
-      body: JSON.stringify({}),
+      body: JSON.stringify(data ?? {}),
     }),
 
   // Recordatorios

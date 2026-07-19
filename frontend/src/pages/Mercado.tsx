@@ -3,6 +3,12 @@ import { api, type MarketProduct } from '../api'
 
 const UNIDADES = ['unidad', 'g', 'kg', 'ml', 'l']
 
+function hoyStr(): string {
+  const d = new Date()
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
 function estado(p: MarketProduct): { texto: string; clase: string } {
   if (!p.cadencia_dias) return { texto: 'sin ciclo', clase: 'pill-mute' }
   if (p.por_comprar) return { texto: 'por comprar', clase: 'pill-warn' }
@@ -14,9 +20,7 @@ function subtitulo(p: MarketProduct): string {
   if (p.cadencia_dias) partes.push(`cada ${p.cadencia_dias} días`)
   if (p.ultima_compra) {
     const d = p.dias_desde
-    partes.push(
-      d === 0 ? 'comprado hoy' : `último hace ${d} día${d === 1 ? '' : 's'}`
-    )
+    partes.push(d === 0 ? 'comprado hoy' : `último hace ${d} día${d === 1 ? '' : 's'}`)
   } else {
     partes.push('sin compras aún')
   }
@@ -26,6 +30,8 @@ function subtitulo(p: MarketProduct): string {
 export default function Mercado() {
   const [productos, setProductos] = useState<MarketProduct[]>([])
   const [cargando, setCargando] = useState(true)
+  const [comprando, setComprando] = useState<MarketProduct | null>(null)
+  const [editando, setEditando] = useState<MarketProduct | null>(null)
 
   const cargar = useCallback(
     () => api.listMarketProducts().then(setProductos).finally(() => setCargando(false)),
@@ -35,17 +41,9 @@ export default function Mercado() {
     cargar()
   }, [cargar])
 
-  const comprar = async (p: MarketProduct) => {
-    await api.registrarCompra(p.id)
-    cargar()
-  }
   const eliminar = async (p: MarketProduct) => {
     if (!window.confirm(`¿Eliminar "${p.nombre}" y su historial de compras?`)) return
     await api.deleteMarketProduct(p.id)
-    cargar()
-  }
-  const cambiarCadencia = async (p: MarketProduct, dias: number | null) => {
-    await api.updateMarketProduct(p.id, { cadencia_dias: dias })
     cargar()
   }
 
@@ -53,6 +51,27 @@ export default function Mercado() {
 
   return (
     <div className="space-y-8 max-w-3xl">
+      {comprando && (
+        <CompraModal
+          producto={comprando}
+          onCerrar={() => setComprando(null)}
+          onGuardado={() => {
+            setComprando(null)
+            cargar()
+          }}
+        />
+      )}
+      {editando && (
+        <EditorProducto
+          producto={editando}
+          onCerrar={() => setEditando(null)}
+          onGuardado={() => {
+            setEditando(null)
+            cargar()
+          }}
+        />
+      )}
+
       <div>
         <h2 className="font-serif text-2xl">Mercado</h2>
         <p className="text-sm text-muted mt-1">
@@ -79,7 +98,10 @@ export default function Mercado() {
                       <div className="font-medium truncate">{p.nombre}</div>
                       <div className="text-xs text-muted mt-0.5">{subtitulo(p)}</div>
                     </div>
-                    <button onClick={() => comprar(p)} className="btn-gold btn text-sm py-1.5 shrink-0">
+                    <button
+                      onClick={() => setComprando(p)}
+                      className="btn-gold btn text-sm py-1.5 shrink-0"
+                    >
                       ✓ Comprado
                     </button>
                   </div>
@@ -110,32 +132,25 @@ export default function Mercado() {
                         </div>
                         <div className="text-xs text-faint mt-0.5">{subtitulo(p)}</div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <label className="text-xs text-faint flex items-center gap-1">
-                          cada
-                          <input
-                            type="number"
-                            min={1}
-                            defaultValue={p.cadencia_dias ?? ''}
-                            onBlur={(ev) =>
-                              cambiarCadencia(p, ev.target.value ? Number(ev.target.value) : null)
-                            }
-                            placeholder="—"
-                            className="input w-14 py-1 text-center"
-                            title="Días entre compras"
-                          />
-                          d
-                        </label>
+                      <div className="flex items-center gap-1.5 shrink-0">
                         <button
-                          onClick={() => comprar(p)}
+                          onClick={() => setComprando(p)}
                           className="btn-ghost btn text-sm py-1"
-                          title="Registrar compra (reinicia el ciclo)"
+                          title="Registrar compra"
                         >
-                          ✓
+                          ✓ Comprado
+                        </button>
+                        <button
+                          onClick={() => setEditando(p)}
+                          className="text-faint hover:text-brand transition px-1"
+                          title="Editar"
+                        >
+                          ✎
                         </button>
                         <button
                           onClick={() => eliminar(p)}
-                          className="opacity-0 group-hover:opacity-100 text-faint hover:text-[color:var(--c-danger)] transition"
+                          className="opacity-0 group-hover:opacity-100 text-faint hover:text-[color:var(--c-danger)] transition px-1"
+                          title="Eliminar"
                         >
                           ✕
                         </button>
@@ -148,6 +163,193 @@ export default function Mercado() {
           </section>
         </>
       )}
+    </div>
+  )
+}
+
+function CompraModal({
+  producto,
+  onCerrar,
+  onGuardado,
+}: {
+  producto: MarketProduct
+  onCerrar: () => void
+  onGuardado: () => void
+}) {
+  const [cantidad, setCantidad] = useState('1')
+  const [precio, setPrecio] = useState('')
+  const [fecha, setFecha] = useState(hoyStr())
+  const [busy, setBusy] = useState(false)
+
+  const guardar = async () => {
+    setBusy(true)
+    try {
+      await api.registrarCompra(producto.id, {
+        cantidad: Number(cantidad) || 1,
+        precio: precio ? Number(precio) : null,
+        fecha,
+      })
+      onGuardado()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4"
+      onClick={onCerrar}
+    >
+      <div className="card w-full max-w-sm p-6 space-y-4" onClick={(ev) => ev.stopPropagation()}>
+        <h3 className="font-serif text-xl">Registrar compra</h3>
+        <p className="text-sm text-muted">{producto.nombre}</p>
+
+        <div className="grid grid-cols-2 gap-3">
+          <label className="text-xs text-muted flex flex-col gap-1">
+            Cantidad ({producto.unidad})
+            <input
+              type="number"
+              value={cantidad}
+              onChange={(ev) => setCantidad(ev.target.value)}
+              className="input"
+            />
+          </label>
+          <label className="text-xs text-muted flex flex-col gap-1">
+            Precio (opcional)
+            <input
+              type="number"
+              value={precio}
+              onChange={(ev) => setPrecio(ev.target.value)}
+              placeholder="—"
+              className="input"
+            />
+          </label>
+        </div>
+        <label className="text-xs text-muted flex flex-col gap-1">
+          Fecha
+          <input
+            type="date"
+            value={fecha}
+            onChange={(ev) => setFecha(ev.target.value)}
+            className="input"
+          />
+        </label>
+
+        <div className="flex justify-end gap-2 pt-1">
+          <button onClick={onCerrar} className="btn-ghost btn">
+            Cancelar
+          </button>
+          <button onClick={guardar} disabled={busy} className="btn">
+            {busy ? 'Guardando…' : 'Registrar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EditorProducto({
+  producto,
+  onCerrar,
+  onGuardado,
+}: {
+  producto: MarketProduct
+  onCerrar: () => void
+  onGuardado: () => void
+}) {
+  const [nombre, setNombre] = useState(producto.nombre)
+  const [unidad, setUnidad] = useState(producto.unidad)
+  const [cadencia, setCadencia] = useState(producto.cadencia_dias?.toString() ?? '')
+  const [notas, setNotas] = useState(producto.notas ?? '')
+  const [activo, setActivo] = useState(producto.activo)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const guardar = async () => {
+    if (!nombre.trim()) return
+    setBusy(true)
+    setError('')
+    try {
+      await api.updateMarketProduct(producto.id, {
+        nombre: nombre.trim(),
+        unidad,
+        cadencia_dias: cadencia ? Number(cadencia) : null,
+        notas: notas.trim() || null,
+        activo,
+      })
+      onGuardado()
+    } catch {
+      setError('No se pudo guardar (¿nombre repetido?)')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4"
+      onClick={onCerrar}
+    >
+      <div className="card w-full max-w-sm p-6 space-y-4" onClick={(ev) => ev.stopPropagation()}>
+        <h3 className="font-serif text-xl">Editar producto</h3>
+
+        <label className="text-xs text-muted flex flex-col gap-1">
+          Nombre
+          <input value={nombre} onChange={(ev) => setNombre(ev.target.value)} className="input" />
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="text-xs text-muted flex flex-col gap-1">
+            Unidad
+            <select value={unidad} onChange={(ev) => setUnidad(ev.target.value)} className="input">
+              {UNIDADES.map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs text-muted flex flex-col gap-1">
+            Cada … días
+            <input
+              type="number"
+              min={1}
+              value={cadencia}
+              onChange={(ev) => setCadencia(ev.target.value)}
+              placeholder="sin ciclo"
+              className="input"
+            />
+          </label>
+        </div>
+        <label className="text-xs text-muted flex flex-col gap-1">
+          Notas
+          <input
+            value={notas}
+            onChange={(ev) => setNotas(ev.target.value)}
+            placeholder="opcional"
+            className="input"
+          />
+        </label>
+        <label className="text-sm text-muted flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={activo}
+            onChange={(ev) => setActivo(ev.target.checked)}
+            className="accent-[color:var(--c-teal)]"
+          />
+          Activo
+        </label>
+
+        {error && <p className="text-[color:var(--c-danger)] text-sm">{error}</p>}
+
+        <div className="flex justify-end gap-2 pt-1">
+          <button onClick={onCerrar} className="btn-ghost btn">
+            Cancelar
+          </button>
+          <button onClick={guardar} disabled={busy} className="btn">
+            {busy ? 'Guardando…' : 'Guardar'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
