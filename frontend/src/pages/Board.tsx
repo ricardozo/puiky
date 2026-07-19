@@ -314,7 +314,7 @@ export function TaskEditor({
           />
         </label>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Fecha
             label="Inicio planeado"
             value={task.fecha_inicio_plan}
