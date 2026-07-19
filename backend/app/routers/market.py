@@ -6,11 +6,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.schemas.market import (
+    CerrarCompra,
     ProductCreate,
     ProductOut,
     ProductUpdate,
     PurchaseCreate,
     PurchaseOut,
+    TripItemCreate,
+    TripItemOut,
+    TripItemUpdate,
+    TripOut,
 )
 from app.services import market as service
 from app.tenancy import get_tenant_db as get_db
@@ -98,3 +103,80 @@ def listar_compras(
 def eliminar_compra(purchase_id: uuid.UUID, db: Session = Depends(get_db)) -> None:
     if not service.delete_purchase(db, purchase_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Compra no encontrada")
+
+
+# --- Modo compra ---
+
+
+@router.post("/trip", response_model=TripOut)
+def iniciar_compra(db: Session = Depends(get_db)) -> TripOut:
+    """Inicia (o retoma) la compra en curso."""
+    return service.start_trip(db)
+
+
+@router.get("/trip", response_model=TripOut | None)
+def compra_en_curso(db: Session = Depends(get_db)) -> TripOut | None:
+    """La compra abierta, o null si no hay ninguna."""
+    return service.get_open_trip(db)
+
+
+@router.get("/trip/{trip_id}", response_model=TripOut)
+def ver_compra(trip_id: uuid.UUID, db: Session = Depends(get_db)) -> TripOut:
+    trip = service.get_trip(db, trip_id)
+    if trip is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Compra no encontrada")
+    return trip
+
+
+@router.post(
+    "/trip/{trip_id}/items", response_model=TripItemOut, status_code=status.HTTP_201_CREATED
+)
+def agregar_item(
+    trip_id: uuid.UUID, data: TripItemCreate, db: Session = Depends(get_db)
+) -> TripItemOut:
+    item = service.add_item(db, trip_id, data)
+    if item is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Compra no encontrada o cerrada")
+    return item
+
+
+@router.post("/trip/{trip_id}/sugerir", response_model=TripOut)
+def sugerir_items(trip_id: uuid.UUID, db: Session = Depends(get_db)) -> TripOut:
+    """Agrega a la lista los productos que toca reponer."""
+    service.add_suggestions(db, trip_id)
+    trip = service.get_trip(db, trip_id)
+    if trip is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Compra no encontrada")
+    return trip
+
+
+@router.put("/trip/items/{item_id}", response_model=TripItemOut)
+def editar_item(
+    item_id: uuid.UUID, data: TripItemUpdate, db: Session = Depends(get_db)
+) -> TripItemOut:
+    """Edita un ítem: marcar comprado, precio, tamaño, cantidad, nombre."""
+    item = service.update_item(db, item_id, data)
+    if item is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Ítem no encontrado")
+    return item
+
+
+@router.delete("/trip/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def quitar_item(item_id: uuid.UUID, db: Session = Depends(get_db)) -> None:
+    if not service.remove_item(db, item_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Ítem no encontrado")
+
+
+@router.post("/trip/{trip_id}/cerrar", response_model=TripOut)
+def cerrar_compra(
+    trip_id: uuid.UUID, data: CerrarCompra, db: Session = Depends(get_db)
+) -> TripOut:
+    """Cierra la compra: calcula el total, registra las compras del catálogo y
+    (si se indica cuenta) crea el gasto en finanzas."""
+    try:
+        trip = service.cerrar_trip(db, trip_id, data)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    if trip is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Compra no encontrada")
+    return trip

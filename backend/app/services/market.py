@@ -8,13 +8,25 @@ al objeto para que el schema los serialice.
 
 import uuid
 from datetime import date
+from decimal import Decimal
 
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from app.models.market import MarketProduct, MarketPurchase
+from app.models.finances import Category
+from app.models.market import MarketProduct, MarketPurchase, ShoppingTrip, TripItem
 from app.models.reminders import Reminder
-from app.schemas.market import ProductCreate, ProductUpdate, PurchaseCreate
+from app.schemas.finances import TransactionCreate, TransactionTipo
+from app.schemas.market import (
+    CerrarCompra,
+    ProductCreate,
+    ProductUpdate,
+    PurchaseCreate,
+    TripItemCreate,
+    TripItemUpdate,
+)
+from app.services import finances as fin
+from app.timeutils import now_local
 
 
 def _ultimas_compras(db: Session) -> dict[uuid.UUID, date]:
@@ -182,3 +194,170 @@ def delete_purchase(db: Session, purchase_id: uuid.UUID) -> bool:
     db.delete(compra)
     db.commit()
     return True
+
+
+# --- Modo compra (una salida al súper) ---
+
+
+def get_open_trip(db: Session) -> ShoppingTrip | None:
+    return (
+        db.execute(
+            select(ShoppingTrip)
+            .where(ShoppingTrip.estado == "abierta")
+            .order_by(ShoppingTrip.creada.desc())
+        )
+        .scalars()
+        .first()
+    )
+
+
+def start_trip(db: Session) -> ShoppingTrip:
+    """Devuelve la compra abierta o crea una nueva (una abierta a la vez)."""
+    t = get_open_trip(db)
+    if t is not None:
+        return t
+    t = ShoppingTrip()
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+    return t
+
+
+def get_trip(db: Session, trip_id: uuid.UUID) -> ShoppingTrip | None:
+    return db.get(ShoppingTrip, trip_id)
+
+
+def _next_orden(db: Session, trip_id: uuid.UUID) -> int:
+    m = db.execute(
+        select(func.max(TripItem.orden)).where(TripItem.trip_id == trip_id)
+    ).scalar()
+    return (m or 0) + 1
+
+
+def add_item(db: Session, trip_id: uuid.UUID, data: TripItemCreate) -> TripItem | None:
+    trip = db.get(ShoppingTrip, trip_id)
+    if trip is None or trip.estado != "abierta":
+        return None
+    product_id = data.product_id
+    if product_id is None:  # enlaza por nombre exacto con el catálogo, si existe
+        prod = db.execute(
+            select(MarketProduct).where(
+                func.lower(MarketProduct.nombre) == data.nombre.lower()
+            )
+        ).scalar_one_or_none()
+        if prod is not None:
+            product_id = prod.id
+    item = TripItem(
+        trip_id=trip_id,
+        product_id=product_id,
+        nombre=data.nombre,
+        cantidad=data.cantidad,
+        tamano=data.tamano,
+        precio=data.precio,
+        comprado=data.comprado,
+        orden=_next_orden(db, trip_id),
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def add_suggestions(db: Session, trip_id: uuid.UUID) -> int:
+    """Agrega a la lista los productos que toca reponer y que no estén ya."""
+    trip = db.get(ShoppingTrip, trip_id)
+    if trip is None or trip.estado != "abierta":
+        return 0
+    ya = {i.product_id for i in trip.items if i.product_id is not None}
+    creados = 0
+    for p in por_comprar(db):
+        if p.id in ya:
+            continue
+        db.add(
+            TripItem(
+                trip_id=trip_id,
+                product_id=p.id,
+                nombre=p.nombre,
+                orden=_next_orden(db, trip_id),
+            )
+        )
+        creados += 1
+    if creados:
+        db.commit()
+    return creados
+
+
+def update_item(
+    db: Session, item_id: uuid.UUID, data: TripItemUpdate
+) -> TripItem | None:
+    item = db.get(TripItem, item_id)
+    if item is None:
+        return None
+    for campo, valor in data.model_dump(exclude_unset=True).items():
+        setattr(item, campo, valor)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def remove_item(db: Session, item_id: uuid.UUID) -> bool:
+    item = db.get(TripItem, item_id)
+    if item is None:
+        return False
+    db.delete(item)
+    db.commit()
+    return True
+
+
+def _find_or_create_category(db: Session, nombre: str) -> Category:
+    c = db.execute(
+        select(Category).where(func.lower(Category.nombre) == nombre.lower())
+    ).scalar_one_or_none()
+    if c is None:
+        c = Category(nombre=nombre, activa=True)
+        db.add(c)
+        db.flush()
+    return c
+
+
+def cerrar_trip(
+    db: Session, trip_id: uuid.UUID, data: CerrarCompra
+) -> ShoppingTrip | None:
+    trip = db.get(ShoppingTrip, trip_id)
+    if trip is None:
+        return None
+    if trip.estado == "cerrada":
+        return trip  # idempotente
+
+    comprados = [i for i in trip.items if i.comprado]
+    total = sum((i.precio for i in comprados if i.precio is not None), Decimal("0"))
+
+    # Gasto en finanzas (opcional, si hay cuenta y total > 0)
+    if data.account_id is not None and total > 0:
+        cat = _find_or_create_category(db, data.categoria or "Mercado")
+        tx = fin.create_transaction(
+            db,
+            TransactionCreate(
+                tipo=TransactionTipo.gasto,
+                monto=total,
+                account_id=data.account_id,
+                category_id=cat.id,
+                nota="Compra de mercado",
+            ),
+        )
+        trip.transaction_id = tx.id
+        trip.account_id = data.account_id
+
+    # Registra en el catálogo las compras (alimenta ciclos/precios, cierra avisos)
+    for i in comprados:
+        if i.product_id is not None:
+            register_purchase(
+                db, i.product_id, PurchaseCreate(cantidad=i.cantidad, precio=i.precio)
+            )
+
+    trip.total = total
+    trip.estado = "cerrada"
+    trip.cerrada_en = now_local()
+    db.commit()
+    db.refresh(trip)
+    return trip

@@ -8,7 +8,12 @@ Dos metadatas (ver base.py):
 
 from app.models.base import Base, ControlBase
 from app.models.finances import Account, Budget, Category, Transaction
-from app.models.market import MarketProduct, MarketPurchase
+from app.models.market import (
+    MarketProduct,
+    MarketPurchase,
+    ShoppingTrip,
+    TripItem,
+)
 from app.models.notebooks import Notebook
 from app.models.notes import Note, NoteLink
 from app.models.portfolios import Portfolio
@@ -32,6 +37,8 @@ __all__ = [
     "ChecklistItem",
     "MarketProduct",
     "MarketPurchase",
+    "ShoppingTrip",
+    "TripItem",
     "Note",
     "NoteLink",
     "Notebook",

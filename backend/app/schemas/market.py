@@ -1,7 +1,7 @@
 """Schemas Pydantic de la lista de mercado."""
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -57,3 +57,54 @@ class PurchaseOut(BaseModel):
     fecha: date
     cantidad: Decimal
     precio: Decimal | None
+
+
+# --- Modo compra (una salida al súper con sus ítems) ---
+
+
+class TripItemCreate(BaseModel):
+    nombre: str = Field(min_length=1, max_length=120)
+    product_id: uuid.UUID | None = None
+    cantidad: Decimal = Field(default=Decimal("1"), gt=0)
+    tamano: str | None = Field(default=None, max_length=40)
+    precio: Decimal | None = Field(default=None, ge=0)
+    comprado: bool = False
+
+
+class TripItemUpdate(BaseModel):
+    nombre: str | None = Field(default=None, min_length=1, max_length=120)
+    cantidad: Decimal | None = Field(default=None, gt=0)
+    tamano: str | None = Field(default=None, max_length=40)
+    precio: Decimal | None = Field(default=None, ge=0)
+    comprado: bool | None = None
+
+
+class TripItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    product_id: uuid.UUID | None
+    nombre: str
+    cantidad: Decimal
+    tamano: str | None
+    precio: Decimal | None
+    comprado: bool
+    orden: int
+
+
+class TripOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    estado: str
+    total: Decimal | None
+    account_id: uuid.UUID | None
+    transaction_id: uuid.UUID | None
+    cerrada_en: datetime | None
+    items: list[TripItemOut] = []
+
+
+class CerrarCompra(BaseModel):
+    # cuenta a la que se carga el gasto (opcional); categoría por defecto "Mercado"
+    account_id: uuid.UUID | None = None
+    categoria: str = Field(default="Mercado", max_length=80)
