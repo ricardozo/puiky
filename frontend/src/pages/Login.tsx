@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useAuth } from '../auth'
 
-export default function Login() {
+export default function Login({ onVolver }: { onVolver?: () => void }) {
   const { login } = useAuth()
   const [usuario, setUsuario] = useState('')
   const [password, setPassword] = useState('')
@@ -24,6 +24,15 @@ export default function Login() {
   return (
     <div className="min-h-screen grid place-items-center bg-ground text-ink px-4">
       <form onSubmit={submit} className="w-full max-w-sm">
+        {onVolver && (
+          <button
+            type="button"
+            onClick={onVolver}
+            className="text-muted hover:text-ink text-sm mb-4"
+          >
+            ← Volver
+          </button>
+        )}
         <div className="text-center mb-8">
           <img
             src="/logo-simbolo.png"

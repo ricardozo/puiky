@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './auth'
 import Layout from './components/Layout'
 import Login from './pages/Login'
+import Landing from './pages/Landing'
 import Notes from './pages/Notes'
 import Projects from './pages/Projects'
 import Board from './pages/Board'
@@ -21,7 +23,7 @@ export default function App() {
       </div>
     )
 
-  if (!usuario) return <Login />
+  if (!usuario) return <Publico />
 
   return (
     <Routes>
@@ -38,5 +40,15 @@ export default function App() {
         <Route path="*" element={<Navigate to="/notas" replace />} />
       </Route>
     </Routes>
+  )
+}
+
+// Área pública (sin sesión): portada "¿Qué es Puiky?" con acceso al login.
+function Publico() {
+  const [verLogin, setVerLogin] = useState(false)
+  return verLogin ? (
+    <Login onVolver={() => setVerLogin(false)} />
+  ) : (
+    <Landing onEntrar={() => setVerLogin(true)} />
   )
 }
