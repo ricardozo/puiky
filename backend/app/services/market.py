@@ -309,6 +309,16 @@ def remove_item(db: Session, item_id: uuid.UUID) -> bool:
     return True
 
 
+def cancel_trip(db: Session, trip_id: uuid.UUID) -> bool:
+    """Descarta una compra abierta (borra la lista, sin registrar nada)."""
+    trip = db.get(ShoppingTrip, trip_id)
+    if trip is None or trip.estado != "abierta":
+        return False
+    db.delete(trip)  # los ítems caen por ON DELETE CASCADE
+    db.commit()
+    return True
+
+
 def _find_or_create_category(db: Session, nombre: str) -> Category:
     c = db.execute(
         select(Category).where(func.lower(Category.nombre) == nombre.lower())

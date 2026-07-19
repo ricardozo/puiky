@@ -441,6 +441,13 @@ function CompraEnCurso({ onCerrada }: { onCerrada: () => void }) {
     await api.updateTripItem(it.id, { comprado: false })
     cargar()
   }
+  const cancelar = async () => {
+    if (!trip) return
+    if (!window.confirm('¿Cancelar esta compra? Se descarta la lista, sin registrar nada.'))
+      return
+    await api.cancelarCompra(trip.id)
+    setTrip(null)
+  }
 
   if (cargando) return null
 
@@ -559,7 +566,13 @@ function CompraEnCurso({ onCerrada }: { onCerrada: () => void }) {
         </ul>
       )}
 
-      <div className="flex justify-end pt-1">
+      <div className="flex items-center justify-between pt-1">
+        <button
+          onClick={cancelar}
+          className="text-sm text-faint hover:text-[color:var(--c-danger)] transition"
+        >
+          Cancelar
+        </button>
         <button onClick={() => setCerrando(true)} className="btn-gold btn">
           Cerrar compra
         </button>

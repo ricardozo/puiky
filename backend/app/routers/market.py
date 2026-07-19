@@ -128,6 +128,15 @@ def ver_compra(trip_id: uuid.UUID, db: Session = Depends(get_db)) -> TripOut:
     return trip
 
 
+@router.delete("/trip/{trip_id}", status_code=status.HTTP_204_NO_CONTENT)
+def cancelar_compra(trip_id: uuid.UUID, db: Session = Depends(get_db)) -> None:
+    """Descarta una compra abierta (sin registrar nada)."""
+    if not service.cancel_trip(db, trip_id):
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, "Compra no encontrada o ya cerrada"
+        )
+
+
 @router.post(
     "/trip/{trip_id}/items", response_model=TripItemOut, status_code=status.HTTP_201_CREATED
 )

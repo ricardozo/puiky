@@ -462,6 +462,8 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  cancelarCompra: (tripId: string) =>
+    request<void>(`/market/trip/${tripId}`, { method: 'DELETE' }),
 
   // Recordatorios
   listReminders: (resuelto?: boolean) =>

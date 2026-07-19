@@ -988,6 +988,14 @@ def _cerrar_compra(db: Session, a: dict) -> dict:
     }
 
 
+def _cancelar_compra(db: Session, a: dict) -> dict:
+    trip = market_svc.get_open_trip(db)
+    if trip is None:
+        return {"ok": False, "error": "No hay una compra en curso."}
+    market_svc.cancel_trip(db, trip.id)
+    return {"ok": True, "cancelada": True}
+
+
 def _p(props: dict, required: list[str]) -> dict:
     return {"type": "object", "properties": props, "required": required}
 
@@ -1457,6 +1465,13 @@ TOOLS: list[Tool] = [
         "registra el gasto en finanzas. Úsalo para «terminé», «cierra la compra».",
         _p({"cuenta": _STR, "categoria": _STR}, []),
         _cerrar_compra,
+    ),
+    Tool(
+        "cancelar_compra",
+        "Descarta la compra en curso sin registrar nada. Úsalo para «cancela la "
+        "compra», «me arrepentí», «borra la lista».",
+        _p({}, []),
+        _cancelar_compra,
     ),
 ]
 
