@@ -31,7 +31,13 @@ from app.schemas.finances import (
     TransactionCreate,
     TransactionTipo,
 )
-from app.schemas.market import ProductCreate, PurchaseCreate
+from app.schemas.market import (
+    CerrarCompra,
+    ProductCreate,
+    PurchaseCreate,
+    TripItemCreate,
+    TripItemUpdate,
+)
 from app.schemas.notebooks import NotebookCreate
 from app.schemas.notes import NoteCreate, NoteLinkCreate, NoteUpdate
 from app.schemas.portfolios import PortfolioCreate
@@ -899,6 +905,89 @@ def _listar_productos_mercado(db: Session, a: dict) -> dict:
     }
 
 
+# --- Modo compra (una salida al súper) ---
+
+
+def _iniciar_compra(db: Session, a: dict) -> dict:
+    trip = market_svc.start_trip(db)
+    return {"ok": True, "items_en_lista": len(trip.items)}
+
+
+def _agregar_a_lista(db: Session, a: dict) -> dict:
+    trip = market_svc.get_open_trip(db) or market_svc.start_trip(db)
+    nombre = a["producto"]
+    market_svc.add_item(db, trip.id, TripItemCreate(nombre=nombre))
+    return {"ok": True, "agregado": nombre}
+
+
+def _agregar_sugeridos(db: Session, a: dict) -> dict:
+    trip = market_svc.get_open_trip(db) or market_svc.start_trip(db)
+    n = market_svc.add_suggestions(db, trip.id)
+    return {"ok": True, "sugeridos_agregados": n}
+
+
+def _marcar_comprado(db: Session, a: dict) -> dict:
+    trip = market_svc.get_open_trip(db) or market_svc.start_trip(db)
+    nombre = a["producto"]
+    precio = a.get("precio")
+    cantidad = a.get("cantidad")
+    tamano = a.get("tamano") or a.get("tamaño")
+    item = next((i for i in trip.items if nombre.lower() in i.nombre.lower()), None)
+    if item is None:  # comprado algo que no estaba en la lista → se agrega marcado
+        market_svc.add_item(
+            db,
+            trip.id,
+            TripItemCreate(
+                nombre=nombre,
+                cantidad=cantidad or 1,
+                precio=precio,
+                tamano=tamano,
+                comprado=True,
+            ),
+        )
+    else:
+        campos: dict = {"comprado": True}
+        if precio is not None:
+            campos["precio"] = precio
+        if cantidad is not None:
+            campos["cantidad"] = cantidad
+        if tamano:
+            campos["tamano"] = tamano
+        market_svc.update_item(db, item.id, TripItemUpdate(**campos))
+    return {
+        "ok": True,
+        "comprado": nombre,
+        "precio": _money(precio) if precio else None,
+    }
+
+
+def _que_me_falta(db: Session, a: dict) -> dict:
+    trip = market_svc.get_open_trip(db)
+    if trip is None:
+        return {"ok": True, "faltan": [], "nota": "No hay una compra en curso."}
+    return {"ok": True, "faltan": [i.nombre for i in trip.items if not i.comprado]}
+
+
+def _cerrar_compra(db: Session, a: dict) -> dict:
+    trip = market_svc.get_open_trip(db)
+    if trip is None:
+        return {"ok": False, "error": "No hay una compra en curso."}
+    cuenta = a.get("cuenta")
+    account_id = _resolver_cuenta(db, cuenta).id if cuenta else None
+    t = market_svc.cerrar_trip(
+        db,
+        trip.id,
+        CerrarCompra(account_id=account_id, categoria=a.get("categoria") or "Mercado"),
+    )
+    comprados = [i for i in t.items if i.comprado]
+    return {
+        "ok": True,
+        "total": _money(t.total or 0),
+        "cuenta": cuenta,
+        "items_comprados": len(comprados),
+    }
+
+
 def _p(props: dict, required: list[str]) -> dict:
     return {"type": "object", "properties": props, "required": required}
 
@@ -1326,6 +1415,48 @@ TOOLS: list[Tool] = [
         "Lista los productos de la lista de mercado con su estado.",
         _p({}, []),
         _listar_productos_mercado,
+    ),
+    Tool(
+        "iniciar_compra",
+        "Inicia (o retoma) la lista de compra en curso para ir al súper.",
+        _p({}, []),
+        _iniciar_compra,
+    ),
+    Tool(
+        "agregar_a_lista",
+        "Agrega un producto a la lista de compra en curso (para ir a comprar).",
+        _p({"producto": _STR}, ["producto"]),
+        _agregar_a_lista,
+    ),
+    Tool(
+        "agregar_sugeridos_compra",
+        "Agrega a la lista de compra los productos que ya toca reponer.",
+        _p({}, []),
+        _agregar_sugeridos,
+    ),
+    Tool(
+        "marcar_comprado",
+        "Marca un producto como comprado en la compra en curso, con precio, "
+        "cantidad y tamaño opcionales. Si no estaba en la lista, lo agrega. Úsalo "
+        "para «compré X», «ya tengo Y a tanto».",
+        _p(
+            {"producto": _STR, "precio": _NUM, "cantidad": _NUM, "tamano": _STR},
+            ["producto"],
+        ),
+        _marcar_comprado,
+    ),
+    Tool(
+        "que_me_falta",
+        "Lista lo que falta por comprar en la compra en curso.",
+        _p({}, []),
+        _que_me_falta,
+    ),
+    Tool(
+        "cerrar_compra",
+        "Cierra la compra en curso: calcula el total y, si se indica la cuenta, "
+        "registra el gasto en finanzas. Úsalo para «terminé», «cierra la compra».",
+        _p({"cuenta": _STR, "categoria": _STR}, []),
+        _cerrar_compra,
     ),
 ]
 
