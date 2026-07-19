@@ -9,10 +9,11 @@ al objeto para que el schema los serialice.
 import uuid
 from datetime import date
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.models.market import MarketProduct, MarketPurchase
+from app.models.reminders import Reminder
 from app.schemas.market import ProductCreate, ProductUpdate, PurchaseCreate
 
 
@@ -145,6 +146,16 @@ def register_purchase(
         precio=data.precio,
     )
     db.add(compra)
+    # cierra el aviso de recompra pendiente de este producto (si lo hay)
+    db.execute(
+        update(Reminder)
+        .where(
+            Reminder.origen_tipo == "market",
+            Reminder.origen_id == product_id,
+            Reminder.resuelto.is_(False),
+        )
+        .values(resuelto=True)
+    )
     db.commit()
     db.refresh(compra)
     return compra

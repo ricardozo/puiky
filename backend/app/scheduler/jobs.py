@@ -18,6 +18,7 @@ from app.models.reminders import Reminder
 from app.models.responsibilities import Responsibility
 from app.models.tasks import Task
 from app.scheduler.notifier import Notifier
+from app.services import market as market_svc
 from app.services.finances import _gasto_del_mes, _rango_mes
 from app.timeutils import zona
 
@@ -145,6 +146,41 @@ def generar_alertas_presupuesto(
                     f"⚠️ Presupuesto {ambito}: llevas {gastado:.0f} de "
                     f"{b.tope:.0f} ({pct}%) este mes."
                 ),
+                disparar_en=ahora,
+            )
+        )
+        creados += 1
+    if creados:
+        db.commit()
+    return creados
+
+
+def generar_alertas_mercado(db: Session, ahora: datetime) -> int:
+    """Crea un aviso por cada producto de mercado que ya toca reponer y que no
+    tenga ya una alerta sin resolver. Se auto-resuelve al registrar la compra."""
+    creados = 0
+    for p in market_svc.por_comprar(db):
+        ya = db.execute(
+            select(Reminder.id).where(
+                Reminder.origen_tipo == "market",
+                Reminder.origen_id == p.id,
+                Reminder.resuelto.is_(False),
+            )
+        ).first()
+        if ya is not None:
+            continue
+        dias = p.dias_desde  # type: ignore[attr-defined]
+        cadencia = f"cada {p.cadencia_dias} días" if p.cadencia_dias else ""
+        cuando = (
+            f" (el último fue hace {dias} días)"
+            if dias is not None
+            else " (aún sin compras registradas)"
+        )
+        db.add(
+            Reminder(
+                origen_tipo="market",
+                origen_id=p.id,
+                texto=f"🛒 Toca reponer «{p.nombre}» — sueles comprarlo {cadencia}{cuando}.",
                 disparar_en=ahora,
             )
         )

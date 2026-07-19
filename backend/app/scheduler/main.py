@@ -48,7 +48,7 @@ async def tick(notifier: Notifier) -> None:
         ctrl.execute(text("SET search_path TO public"))
         tenants = _tenants_con_chats(ctrl)
 
-    total_c = total_a = total_e = 0
+    total_c = total_a = total_m = total_e = 0
     for schema, chat_ids in tenants:
         with SessionLocal() as db:
             db.execute(text(f'SET search_path TO "{schema}", public'))
@@ -58,14 +58,15 @@ async def tick(notifier: Notifier) -> None:
             total_a += jobs.generar_alertas_presupuesto(
                 db, ahora, s.budget_alert_threshold
             )
+            total_m += jobs.generar_alertas_mercado(db, ahora)
             total_e += await jobs.entregar_pendientes(
                 db, notifier, chat_ids, ahora, s.reminder_realert_hours
             )
 
-    if total_c or total_a or total_e:
+    if total_c or total_a or total_m or total_e:
         logger.info(
-            "tick: %d avisos, %d alertas de presupuesto, %d entregados (en %d inquilinos)",
-            total_c, total_a, total_e, len(tenants),
+            "tick: %d avisos, %d presupuesto, %d mercado, %d entregados (en %d inquilinos)",
+            total_c, total_a, total_m, total_e, len(tenants),
         )
 
 
