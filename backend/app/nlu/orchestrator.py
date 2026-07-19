@@ -8,6 +8,7 @@ resultados para que redacte una confirmación natural.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -19,9 +20,34 @@ from app.models.market import MarketProduct
 from app.models.notebooks import Notebook
 from app.models.portfolios import Portfolio
 from app.models.projects import Project
-from app.nlu.provider import LLMProvider, get_llm_provider
+from app.nlu.provider import LLMProvider, ToolCall, get_llm_provider
 from app.nlu.tools import dispatch, openai_tools
 from app.timeutils import now_local
+
+# Objeto JSON con posible anidación de un nivel (para {"name":..,"arguments":{..}})
+_OBJ = re.compile(r"\{(?:[^{}]|\{[^{}]*\})*\}")
+
+
+def _tool_calls_desde_texto(content: str | None) -> list[ToolCall]:
+    """Rescata tool calls que el modelo emitió como TEXTO en vez de usar el canal
+    nativo. Qwen (vía Ollama) a veces «narra» el {"name":..,"arguments":..} en el
+    contenido; sin esto la acción nunca se ejecutaría."""
+    if not content:
+        return []
+    validos = {t["function"]["name"] for t in openai_tools()}
+    calls: list[ToolCall] = []
+    for m in _OBJ.finditer(content):
+        frag = m.group(0)
+        if '"name"' not in frag or '"arguments"' not in frag:
+            continue
+        try:
+            obj = json.loads(frag)
+        except json.JSONDecodeError:
+            continue
+        nombre, args = obj.get("name"), obj.get("arguments")
+        if nombre in validos and isinstance(args, dict):
+            calls.append(ToolCall(name=nombre, arguments=args))
+    return calls
 
 
 @dataclass
@@ -84,6 +110,14 @@ def _system_prompt(db: Session) -> str:
         f"- Categorías: {', '.join(categorias) or '(ninguna)'}. Mapea expresiones "
         "libres ('mercado', 'súper') a la más adecuada; si ninguna aplica, 'Otros'.\n"
         f"- Cuentas: {', '.join(cuentas) or '(ninguna)'}. Úsalas sin preguntar.\n"
+        "- REGLA DE DINERO: si el usuario dice que gastó, pagó o compró y menciona "
+        "un monto (p. ej. «gasté 15 mil en agua y leche», «pagué 19 mil el "
+        "desayuno») es SIEMPRE registrar_gasto, con ese monto, la cuenta indicada "
+        "y una categoría de la lista (mapea 'agua y leche', 'desayuno', 'súper' → "
+        "Mercado o Comida). NUNCA uses registrar_compra_mercado para esto. "
+        "registrar_compra_mercado NO mueve dinero y solo aplica si <algo> coincide "
+        "con un nombre de 'Productos de mercado' de abajo; si no está en esa "
+        "lista, es un gasto. Ante la duda, registrar_gasto.\n"
         f"- Portafolios: {', '.join(portafolios) or '(ninguno)'} (agrupan proyectos).\n"
         f"- Proyectos activos: {', '.join(proyectos) or '(ninguno)'}.\n"
         f"- Productos de mercado: {', '.join(productos) or '(ninguno)'}. Para "
@@ -118,7 +152,10 @@ def interpret(
     messages.append({"role": "user", "content": texto})
 
     resp = provider.chat(messages, tools)
-    if not resp.tool_calls:
+    # Usa las tool calls nativas; si no hay, rescata las que el modelo pudo haber
+    # emitido como texto (Qwen a veces lo hace y la acción se perdería).
+    tool_calls = resp.tool_calls or _tool_calls_desde_texto(resp.content)
+    if not tool_calls:
         return InterpretResult(respuesta=resp.content or "")
 
     # Registra la decisión del modelo (necesario para adjuntar los resultados).
@@ -135,13 +172,13 @@ def interpret(
                         "arguments": json.dumps(tc.arguments, ensure_ascii=False),
                     },
                 }
-                for i, tc in enumerate(resp.tool_calls)
+                for i, tc in enumerate(tool_calls)
             ],
         }
     )
 
     acciones: list[Accion] = []
-    for i, tc in enumerate(resp.tool_calls):
+    for i, tc in enumerate(tool_calls):
         resultado = dispatch(db, tc.name, tc.arguments)
         acciones.append(Accion(tool=tc.name, argumentos=tc.arguments, resultado=resultado))
         messages.append(
@@ -154,4 +191,21 @@ def interpret(
 
     # Segunda llamada SIN tools: solo queremos la confirmación en texto.
     final = provider.chat(messages, [])
-    return InterpretResult(respuesta=final.content or "", acciones=acciones)
+    respuesta = final.content or ""
+    # Blindaje: si el modelo vuelve a «narrar» un JSON de tool call en vez de
+    # confirmar, no se lo mostramos al usuario; armamos una confirmación simple.
+    if not respuesta.strip() or _tool_calls_desde_texto(respuesta):
+        respuesta = _confirmacion_fallback(acciones)
+    return InterpretResult(respuesta=respuesta, acciones=acciones)
+
+
+def _confirmacion_fallback(acciones: list[Accion]) -> str:
+    """Confirmación armada a mano cuando el modelo no redacta bien la 2ª pasada."""
+    ok = [a for a in acciones if a.resultado.get("ok", True)]
+    err = [a for a in acciones if not a.resultado.get("ok", True)]
+    partes: list[str] = []
+    if ok:
+        partes.append("Listo, lo registré." if len(ok) == 1 else f"Listo, registré {len(ok)} cosas.")
+    for a in err:
+        partes.append(f"No pude con «{a.tool}»: {a.resultado.get('error', 'error')}")
+    return " ".join(partes) or "Listo."

@@ -112,7 +112,15 @@ def _resolver_categoria(db: Session, ref: str) -> Category:
             )
         ).scalars().first()
     if fila is None:
-        raise ValueError(f"No existe la categoría «{ref}».")
+        # El modelo a veces inventa una categoría; no fallamos por eso: cae en
+        # 'Otros' (se crea si no existe). El usuario puede recategorizar luego.
+        fila = db.execute(
+            select(Category).where(func.lower(Category.nombre) == "otros")
+        ).scalar_one_or_none()
+        if fila is None:
+            fila = Category(nombre="Otros", activa=True)
+            db.add(fila)
+            db.flush()
     return fila
 
 
@@ -1407,8 +1415,10 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         "registrar_compra_mercado",
-        "Registra que se compró un producto de la lista (reinicia su ciclo de "
-        "recompra). `producto` es el nombre.",
+        "Registra la reposición de un producto que YA existe en la lista de "
+        "mercado (reinicia su ciclo de recompra). NO mueve dinero ni registra "
+        "gastos. Úsala solo si `producto` coincide con un producto de mercado "
+        "existente; para «gasté/pagué/compré X en/para Y» usa registrar_gasto.",
         _p({"producto": _STR, "cantidad": _NUM, "precio": _NUM}, ["producto"]),
         _registrar_compra_mercado,
     ),
@@ -1446,7 +1456,10 @@ TOOLS: list[Tool] = [
         "marcar_comprado",
         "Marca un producto como comprado en la compra en curso, con precio, "
         "cantidad y tamaño opcionales. Si no estaba en la lista, lo agrega. Úsalo "
-        "para «compré X», «ya tengo Y a tanto».",
+        "para «compré X», «ya tengo Y a tanto». `precio` es el TOTAL pagado por "
+        "esa línea (todas las unidades): si dan el valor por unidad, multiplícalo "
+        "por la cantidad (p. ej. «2 a 5 mil cada uno» → cantidad 2, precio 10000). "
+        "`tamano` es la presentación (p. ej. «botella 600ml», «bolsa 1kg»).",
         _p(
             {"producto": _STR, "precio": _NUM, "cantidad": _NUM, "tamano": _STR},
             ["producto"],
