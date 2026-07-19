@@ -24,10 +24,31 @@ down_revision: str | None = None
 branch_labels: Sequence[str] | None = ("domain",)
 depends_on: str | None = None
 
+# Baseline CONGELADO: exactamente las tablas de dominio que existían al crear el
+# baseline. Se lista explícito (no toda la metadata viva) para que agregar
+# modelos nuevos vaya en migraciones incrementales (domain_0002, …) y no aquí.
+_BASELINE_TABLES = (
+    "notebook",
+    "note",
+    "note_link",
+    "portfolio",
+    "project",
+    "task",
+    "checklist_item",
+    "account",
+    "category",
+    "transaction",
+    "budget",
+    "reminder",
+    "responsibility",
+)
+
 
 def upgrade() -> None:
-    Base.metadata.create_all(bind=op.get_bind())
+    md = Base.metadata
+    md.create_all(bind=op.get_bind(), tables=[md.tables[t] for t in _BASELINE_TABLES])
 
 
 def downgrade() -> None:
-    Base.metadata.drop_all(bind=op.get_bind())
+    md = Base.metadata
+    md.drop_all(bind=op.get_bind(), tables=[md.tables[t] for t in _BASELINE_TABLES])
