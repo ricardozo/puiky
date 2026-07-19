@@ -8,6 +8,7 @@ const SECCIONES = [
   { to: '/proyectos', label: 'Proyectos', icon: '📋' },
   { to: '/tareas', label: 'Tareas', icon: '✅' },
   { to: '/finanzas', label: 'Finanzas', icon: '💰' },
+  { to: '/mercado', label: 'Mercado', icon: '🛒' },
   { to: '/responsabilidades', label: 'Responsabilidades', icon: '🔁' },
   { to: '/recordatorios', label: 'Recordatorios', icon: '⏰' },
 ]

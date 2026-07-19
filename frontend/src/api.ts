@@ -180,6 +180,27 @@ export interface Responsibility {
   monto: string | null
 }
 
+export interface MarketProduct {
+  id: string
+  nombre: string
+  unidad: string
+  presentacion: string | null
+  cadencia_dias: number | null
+  category_id: string | null
+  activo: boolean
+  notas: string | null
+  ultima_compra: string | null
+  por_comprar: boolean
+  dias_desde: number | null
+}
+export interface NuevoProducto {
+  nombre: string
+  unidad?: string
+  cadencia_dias?: number | null
+  category_id?: string | null
+  notas?: string | null
+}
+
 export const api = {
   login: (usuario: string, password: string) =>
     request<{ access_token: string }>('/auth/login', {
@@ -362,6 +383,27 @@ export const api = {
     }),
   deleteBudget: (id: string) =>
     request<void>(`/budgets/${id}`, { method: 'DELETE' }),
+
+  // Mercado
+  listMarketProducts: () => request<MarketProduct[]>('/market/products'),
+  porComprar: () => request<MarketProduct[]>('/market/por-comprar'),
+  createMarketProduct: (data: NuevoProducto) =>
+    request<MarketProduct>('/market/products', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateMarketProduct: (id: string, data: Partial<NuevoProducto> & { activo?: boolean }) =>
+    request<MarketProduct>(`/market/products/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteMarketProduct: (id: string) =>
+    request<void>(`/market/products/${id}`, { method: 'DELETE' }),
+  registrarCompra: (id: string) =>
+    request<unknown>(`/market/products/${id}/compras`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
 
   // Recordatorios
   listReminders: (resuelto?: boolean) =>
