@@ -201,6 +201,26 @@ export interface NuevoProducto {
   notas?: string | null
 }
 
+export interface TripItem {
+  id: string
+  product_id: string | null
+  nombre: string
+  cantidad: string
+  tamano: string | null
+  precio: string | null
+  comprado: boolean
+  orden: number
+}
+export interface Trip {
+  id: string
+  estado: string
+  total: string | null
+  account_id: string | null
+  transaction_id: string | null
+  cerrada_en: string | null
+  items: TripItem[]
+}
+
 export const api = {
   login: (usuario: string, password: string) =>
     request<{ access_token: string }>('/auth/login', {
@@ -406,6 +426,41 @@ export const api = {
     request<unknown>(`/market/products/${id}/compras`, {
       method: 'POST',
       body: JSON.stringify(data ?? {}),
+    }),
+
+  // Modo compra
+  compraEnCurso: () => request<Trip | null>('/market/trip'),
+  iniciarCompra: () => request<Trip>('/market/trip', { method: 'POST' }),
+  sugerirCompra: (tripId: string) =>
+    request<Trip>(`/market/trip/${tripId}/sugerir`, { method: 'POST' }),
+  addTripItem: (tripId: string, data: { nombre: string }) =>
+    request<TripItem>(`/market/trip/${tripId}/items`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateTripItem: (
+    itemId: string,
+    data: {
+      comprado?: boolean
+      precio?: number | null
+      cantidad?: number
+      tamano?: string | null
+      nombre?: string
+    }
+  ) =>
+    request<TripItem>(`/market/trip/items/${itemId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  removeTripItem: (itemId: string) =>
+    request<void>(`/market/trip/items/${itemId}`, { method: 'DELETE' }),
+  cerrarCompra: (
+    tripId: string,
+    data: { account_id?: string | null; categoria?: string }
+  ) =>
+    request<Trip>(`/market/trip/${tripId}/cerrar`, {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
 
   // Recordatorios

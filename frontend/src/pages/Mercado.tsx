@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { api, type MarketProduct } from '../api'
+import { api, type Account, type MarketProduct, type Trip, type TripItem } from '../api'
 
 const UNIDADES = ['unidad', 'g', 'kg', 'ml', 'l']
 
@@ -78,6 +78,8 @@ export default function Mercado() {
           Tus productos recurrentes. Marca cuando compras y Puiky te avisa cuándo reponer.
         </p>
       </div>
+
+      <CompraEnCurso onCerrada={cargar} />
 
       <NuevoProductoForm onCreado={cargar} />
 
@@ -397,5 +399,298 @@ function NuevoProductoForm({ onCreado }: { onCreado: () => void }) {
       />
       <button className="btn">Agregar</button>
     </form>
+  )
+}
+
+function fmt(v: string | number | null): string {
+  if (v === null || v === '') return '0'
+  return Number(v).toLocaleString('es-CO', { maximumFractionDigits: 0 })
+}
+
+function CompraEnCurso({ onCerrada }: { onCerrada: () => void }) {
+  const [trip, setTrip] = useState<Trip | null>(null)
+  const [cargando, setCargando] = useState(true)
+  const [nuevo, setNuevo] = useState('')
+  const [item, setItem] = useState<TripItem | null>(null)
+  const [cerrando, setCerrando] = useState(false)
+
+  const cargar = useCallback(
+    () => api.compraEnCurso().then(setTrip).finally(() => setCargando(false)),
+    []
+  )
+  useEffect(() => {
+    cargar()
+  }, [cargar])
+
+  const iniciar = async () => setTrip(await api.iniciarCompra())
+  const sugerir = async () => {
+    if (trip) setTrip(await api.sugerirCompra(trip.id))
+  }
+  const agregar = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!trip || !nuevo.trim()) return
+    await api.addTripItem(trip.id, { nombre: nuevo.trim() })
+    setNuevo('')
+    cargar()
+  }
+  const quitar = async (it: TripItem) => {
+    await api.removeTripItem(it.id)
+    cargar()
+  }
+  const desmarcar = async (it: TripItem) => {
+    await api.updateTripItem(it.id, { comprado: false })
+    cargar()
+  }
+
+  if (cargando) return null
+
+  if (!trip) {
+    return (
+      <div className="card p-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="font-medium">¿Vas al súper?</div>
+          <div className="text-xs text-muted mt-0.5">
+            Arma tu lista y ve marcando lo que compras.
+          </div>
+        </div>
+        <button onClick={iniciar} className="btn">
+          🛒 Iniciar compra
+        </button>
+      </div>
+    )
+  }
+
+  const total = trip.items
+    .filter((i) => i.comprado)
+    .reduce((s, i) => s + Number(i.precio || 0), 0)
+  const faltan = trip.items.filter((i) => !i.comprado).length
+
+  return (
+    <section className="card p-5 space-y-4 border-[color:var(--c-brand)]">
+      {item && (
+        <ItemModal
+          item={item}
+          onCerrar={() => setItem(null)}
+          onGuardado={() => {
+            setItem(null)
+            cargar()
+          }}
+        />
+      )}
+      {cerrando && (
+        <CerrarModal
+          trip={trip}
+          onCerrar={() => setCerrando(false)}
+          onCerrada={() => {
+            setCerrando(false)
+            setTrip(null)
+            onCerrada()
+          }}
+        />
+      )}
+
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="eyebrow text-brand">Compra en curso</h3>
+        <span className="text-sm text-muted">
+          {faltan} por comprar ·{' '}
+          <span className="text-ink font-medium">${fmt(total)}</span> en el carrito
+        </span>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <form onSubmit={agregar} className="flex gap-2 flex-1 min-w-48">
+          <input
+            value={nuevo}
+            onChange={(e) => setNuevo(e.target.value)}
+            placeholder="Agregar a la lista…"
+            className="input flex-1"
+          />
+          <button className="btn-ghost btn">+</button>
+        </form>
+        <button onClick={sugerir} className="btn-ghost btn text-sm" title="Agregar lo que toca reponer">
+          ✨ Sugerir
+        </button>
+      </div>
+
+      {trip.items.length === 0 ? (
+        <p className="text-faint text-sm">
+          Lista vacía. Agrega productos o toca «Sugerir».
+        </p>
+      ) : (
+        <ul className="divide-y divide-[color:var(--c-line)]">
+          {trip.items.map((it) => (
+            <li key={it.id} className="group flex items-center gap-3 py-2.5">
+              <button
+                onClick={() => (it.comprado ? desmarcar(it) : setItem(it))}
+                className={`size-6 rounded-full border flex items-center justify-center shrink-0 text-sm ${
+                  it.comprado
+                    ? 'bg-[color:var(--c-green)] border-transparent text-white'
+                    : 'border-line text-transparent hover:border-teal'
+                }`}
+                title={it.comprado ? 'Comprado (clic para desmarcar)' : 'Marcar comprado'}
+              >
+                ✓
+              </button>
+              <div className="min-w-0 flex-1">
+                <div className={`truncate ${it.comprado ? 'text-muted' : ''}`}>
+                  {it.nombre}
+                </div>
+                {it.comprado && (it.precio || it.tamano) && (
+                  <div className="text-xs text-faint">
+                    {it.tamano}
+                    {it.tamano && it.precio ? ' · ' : ''}
+                    {it.precio ? `$${fmt(it.precio)}` : ''}
+                  </div>
+                )}
+              </div>
+              {!it.comprado && (
+                <button onClick={() => setItem(it)} className="btn-ghost btn text-sm py-1">
+                  ✓ Comprar
+                </button>
+              )}
+              <button
+                onClick={() => quitar(it)}
+                className="opacity-0 group-hover:opacity-100 text-faint hover:text-[color:var(--c-danger)] transition px-1"
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="flex justify-end pt-1">
+        <button onClick={() => setCerrando(true)} className="btn-gold btn">
+          Cerrar compra
+        </button>
+      </div>
+    </section>
+  )
+}
+
+function ItemModal({
+  item,
+  onCerrar,
+  onGuardado,
+}: {
+  item: TripItem
+  onCerrar: () => void
+  onGuardado: () => void
+}) {
+  const [cantidad, setCantidad] = useState(item.cantidad ? String(Number(item.cantidad)) : '1')
+  const [tamano, setTamano] = useState(item.tamano ?? '')
+  const [precio, setPrecio] = useState(item.precio ? String(Number(item.precio)) : '')
+  const [busy, setBusy] = useState(false)
+
+  const guardar = async () => {
+    setBusy(true)
+    try {
+      await api.updateTripItem(item.id, {
+        comprado: true,
+        cantidad: Number(cantidad) || 1,
+        tamano: tamano.trim() || null,
+        precio: precio ? Number(precio) : null,
+      })
+      onGuardado()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4" onClick={onCerrar}>
+      <div className="card w-full max-w-sm p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-serif text-xl">Comprar</h3>
+        <p className="text-sm text-muted">{item.nombre}</p>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="text-xs text-muted flex flex-col gap-1">
+            Cantidad
+            <input type="number" value={cantidad} onChange={(e) => setCantidad(e.target.value)} className="input" />
+          </label>
+          <label className="text-xs text-muted flex flex-col gap-1">
+            Tamaño
+            <input value={tamano} onChange={(e) => setTamano(e.target.value)} placeholder="2 L, 500 g…" className="input" />
+          </label>
+        </div>
+        <label className="text-xs text-muted flex flex-col gap-1">
+          Precio (opcional)
+          <input type="number" value={precio} onChange={(e) => setPrecio(e.target.value)} placeholder="—" className="input" />
+        </label>
+        <div className="flex justify-end gap-2 pt-1">
+          <button onClick={onCerrar} className="btn-ghost btn">
+            Cancelar
+          </button>
+          <button onClick={guardar} disabled={busy} className="btn">
+            {busy ? 'Guardando…' : '✓ Comprado'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CerrarModal({
+  trip,
+  onCerrar,
+  onCerrada,
+}: {
+  trip: Trip
+  onCerrar: () => void
+  onCerrada: () => void
+}) {
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [cuenta, setCuenta] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    api.listAccounts().then(setAccounts)
+  }, [])
+
+  const total = trip.items
+    .filter((i) => i.comprado)
+    .reduce((s, i) => s + Number(i.precio || 0), 0)
+
+  const cerrar = async () => {
+    setBusy(true)
+    try {
+      await api.cerrarCompra(trip.id, { account_id: cuenta || null, categoria: 'Mercado' })
+      onCerrada()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4" onClick={onCerrar}>
+      <div className="card w-full max-w-sm p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-serif text-xl">Cerrar compra</h3>
+        <p className="text-sm text-muted">
+          Total del carrito:{' '}
+          <span className="text-ink font-medium">${fmt(total)}</span>
+        </p>
+        <label className="text-xs text-muted flex flex-col gap-1">
+          Cargar el gasto a
+          <select value={cuenta} onChange={(e) => setCuenta(e.target.value)} className="input">
+            <option value="">No registrar gasto</option>
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.nombre}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="text-xs text-faint">
+          Se guardan las compras del catálogo y (si eliges cuenta) el gasto en finanzas.
+        </p>
+        <div className="flex justify-end gap-2 pt-1">
+          <button onClick={onCerrar} className="btn-ghost btn">
+            Cancelar
+          </button>
+          <button onClick={cerrar} disabled={busy} className="btn-gold btn">
+            {busy ? 'Cerrando…' : 'Cerrar compra'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
