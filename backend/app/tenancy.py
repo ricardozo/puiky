@@ -23,7 +23,7 @@ from dataclasses import dataclass
 
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select, text
+from sqlalchemy import event, select, text
 from sqlalchemy.orm import Session
 
 from app.auth.security import verificar_token_claims
@@ -33,6 +33,20 @@ from app.models.users import User
 
 _bearer = HTTPBearer(auto_error=False)
 _SCHEMA_RE = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
+
+
+@event.listens_for(Session, "after_begin")
+def _reaplicar_search_path(session: Session, transaction, connection) -> None:
+    """Reaplica el search_path del inquilino al comienzo de CADA transacción.
+
+    Un `commit` a mitad de una petición (p. ej. registrar el pago de una
+    responsabilidad, que crea un gasto en finanzas) libera la conexión al pool;
+    la siguiente operación toma una conexión con el search_path por defecto y no
+    vería el schema del inquilino. Guardamos el schema en `session.info` y lo
+    reponemos aquí, sin que los servicios de dominio tengan que saber de esto."""
+    schema = session.info.get("tenant_schema")
+    if schema:  # schema ya validado por el regex antes de guardarse
+        connection.exec_driver_sql(f'SET search_path TO "{schema}", public')
 
 
 @dataclass
@@ -109,6 +123,8 @@ def get_tenant_db(
     try:
         principal = _resolver_principal(db, creds.credentials, x_tenant_user)
         _set_search_path(db, principal.tenant_schema)
+        # Guardado para reaplicar el search_path tras cada commit (ver listener).
+        db.info["tenant_schema"] = principal.tenant_schema
         db.info["principal"] = principal
         yield db
     finally:
