@@ -4,7 +4,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import UUID, Date, Index, Numeric, String, text
+from sqlalchemy import UUID, Date, ForeignKey, Index, Numeric, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -12,7 +12,10 @@ from app.models.base import Base
 
 class Responsibility(Base):
     """Compromiso que se repite (arriendo, renovaciones). Al cumplirse, su
-    `proximo_venc` se recalcula según `recurrencia`."""
+    `proximo_venc` se recalcula según `recurrencia`.
+
+    Si tiene `account_id` y `monto`, al registrar el pago se crea un gasto en
+    finanzas (categoría `category_id`, o 'Otros' si no se indica)."""
 
     __tablename__ = "responsibility"
     __table_args__ = (Index("ix_responsibility_proximo_venc", "proximo_venc"),)
@@ -25,3 +28,10 @@ class Responsibility(Base):
     recurrencia: Mapped[str] = mapped_column(String(30), nullable=False)
     proximo_venc: Mapped[date] = mapped_column(Date, nullable=False)
     monto: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    # Enlace opcional con finanzas: de qué cuenta sale el dinero y con qué categoría.
+    account_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("account.id", ondelete="SET NULL"), nullable=True
+    )
+    category_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("category.id", ondelete="SET NULL"), nullable=True
+    )

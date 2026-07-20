@@ -2,13 +2,16 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.models.finances import Account
 from app.tenancy import get_tenant_db as get_db
 from app.schemas.responsibilities import (
     ResponsibilityCreate,
     ResponsibilityOut,
+    ResponsibilityPay,
+    ResponsibilityPayResult,
     ResponsibilityUpdate,
 )
 from app.services import responsibilities as service
@@ -59,11 +62,36 @@ def editar_responsabilidad(
 def cumplir_responsabilidad(
     resp_id: uuid.UUID, db: Session = Depends(get_db)
 ) -> ResponsibilityOut:
-    """Marca cumplida y recalcula el próximo vencimiento."""
+    """Marca cumplida y recalcula el próximo vencimiento (sin tocar finanzas)."""
     resp = service.fulfill_responsibility(db, resp_id)
     if resp is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Responsabilidad no encontrada")
     return resp
+
+
+@router.post("/{resp_id}/pay", response_model=ResponsibilityPayResult)
+def registrar_pago(
+    resp_id: uuid.UUID,
+    data: ResponsibilityPay = Body(default_factory=ResponsibilityPay),
+    db: Session = Depends(get_db),
+) -> ResponsibilityPayResult:
+    """Registra el pago: crea el gasto en finanzas (si hay cuenta y monto) y
+    avanza el próximo vencimiento."""
+    try:
+        result = service.pay_responsibility(db, resp_id, data)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    if result is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Responsabilidad no encontrada")
+    resp, tx = result
+    cuenta = db.get(Account, tx.account_id) if tx else None
+    return ResponsibilityPayResult(
+        responsabilidad=ResponsibilityOut.model_validate(resp),
+        gasto_creado=tx is not None,
+        monto=tx.monto if tx else None,
+        cuenta=cuenta.nombre if cuenta else None,
+        saldo_cuenta=cuenta.saldo if cuenta else None,
+    )
 
 
 @router.delete("/{resp_id}", status_code=status.HTTP_204_NO_CONTENT)

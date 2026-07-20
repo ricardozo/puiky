@@ -43,7 +43,11 @@ from app.schemas.notes import NoteCreate, NoteLinkCreate, NoteUpdate
 from app.schemas.portfolios import PortfolioCreate
 from app.schemas.projects import ProjectCreate, ProjectEstado, ProjectUpdate
 from app.schemas.reminders import ReminderCreate
-from app.schemas.responsibilities import ResponsibilityCreate, ResponsibilityUpdate
+from app.schemas.responsibilities import (
+    ResponsibilityCreate,
+    ResponsibilityPay,
+    ResponsibilityUpdate,
+)
 from app.schemas.tasks import (
     ChecklistItemCreate,
     ChecklistItemUpdate,
@@ -712,6 +716,8 @@ def _crear_recordatorio(db: Session, a: dict) -> dict:
 
 
 def _crear_responsabilidad(db: Session, a: dict) -> dict:
+    cuenta = _resolver_cuenta(db, a["cuenta"]) if a.get("cuenta") else None
+    categoria = _resolver_categoria(db, a["categoria"]) if a.get("categoria") else None
     r = resp_svc.create_responsibility(
         db,
         ResponsibilityCreate(
@@ -719,9 +725,16 @@ def _crear_responsabilidad(db: Session, a: dict) -> dict:
             recurrencia=a["recurrencia"],
             proximo_venc=date.fromisoformat(a["proximo_venc"]),
             monto=a.get("monto"),
+            account_id=cuenta.id if cuenta else None,
+            category_id=categoria.id if categoria else None,
         ),
     )
-    return {"ok": True, "nombre": r.nombre, "proximo_venc": r.proximo_venc.isoformat()}
+    return {
+        "ok": True,
+        "nombre": r.nombre,
+        "proximo_venc": r.proximo_venc.isoformat(),
+        "cuenta": cuenta.nombre if cuenta else None,
+    }
 
 
 def _resolver_responsabilidad(db: Session, ref: str) -> Responsibility:
@@ -772,6 +785,31 @@ def _cumplir_responsabilidad(db: Session, a: dict) -> dict:
         "ok": True,
         "responsabilidad": r2.nombre,
         "proximo_venc": r2.proximo_venc.isoformat(),
+    }
+
+
+def _pagar_responsabilidad(db: Session, a: dict) -> dict:
+    """Registra el pago de una responsabilidad: crea el gasto (si hay cuenta y
+    monto) y avanza el vencimiento. cuenta/categoria/monto son overrides."""
+    r = _resolver_responsabilidad(db, a["responsabilidad"])
+    cuenta = _resolver_cuenta(db, a["cuenta"]) if a.get("cuenta") else None
+    categoria = _resolver_categoria(db, a["categoria"]) if a.get("categoria") else None
+    resp, tx = resp_svc.pay_responsibility(
+        db,
+        r.id,
+        ResponsibilityPay(
+            monto=a.get("monto"),
+            account_id=cuenta.id if cuenta else None,
+            category_id=categoria.id if categoria else None,
+        ),
+    )
+    return {
+        "ok": True,
+        "responsabilidad": resp.nombre,
+        "proximo_venc": resp.proximo_venc.isoformat(),
+        "gasto_creado": tx is not None,
+        "monto": _money(tx.monto) if tx else None,
+        "cuenta": resp.cuenta,  # nombre adjuntado por el servicio
     }
 
 
@@ -1329,9 +1367,19 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         "crear_responsabilidad",
-        "Crea un compromiso recurrente. recurrencia: diaria|semanal|mensual|trimestral|anual|cada_N_dias. proximo_venc en YYYY-MM-DD.",
+        "Crea un compromiso recurrente (arriendo, administración, renovación). "
+        "recurrencia: diaria|semanal|mensual|trimestral|anual|cada_N_dias. "
+        "proximo_venc en YYYY-MM-DD. Opcional: monto, y cuenta/categoria para que "
+        "al pagarlo se registre el gasto en finanzas.",
         _p(
-            {"nombre": _STR, "recurrencia": _STR, "proximo_venc": _STR, "monto": _NUM},
+            {
+                "nombre": _STR,
+                "recurrencia": _STR,
+                "proximo_venc": _STR,
+                "monto": _NUM,
+                "cuenta": _STR,
+                "categoria": _STR,
+            },
             ["nombre", "recurrencia", "proximo_venc"],
         ),
         _crear_responsabilidad,
@@ -1344,10 +1392,28 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         "cumplir_responsabilidad",
-        "Marca una responsabilidad como cumplida (por su nombre); recalcula el "
-        "próximo vencimiento según su recurrencia.",
+        "Marca una responsabilidad como cumplida SIN registrar dinero (para "
+        "compromisos sin costo, p. ej. «renovar el pasaporte»); recalcula el "
+        "próximo vencimiento.",
         _p({"responsabilidad": _STR}, ["responsabilidad"]),
         _cumplir_responsabilidad,
+    ),
+    Tool(
+        "pagar_responsabilidad",
+        "Registra el PAGO de una responsabilidad (por su nombre): crea el gasto "
+        "en finanzas con su cuenta y monto guardados y avanza el vencimiento. "
+        "Úsala para «pagué la administración/el arriendo». Opcional: cuenta, "
+        "categoria o monto para sobrescribir lo guardado esta vez.",
+        _p(
+            {
+                "responsabilidad": _STR,
+                "cuenta": _STR,
+                "categoria": _STR,
+                "monto": _NUM,
+            },
+            ["responsabilidad"],
+        ),
+        _pagar_responsabilidad,
     ),
     Tool(
         "editar_responsabilidad",

@@ -20,6 +20,7 @@ from app.models.market import MarketProduct
 from app.models.notebooks import Notebook
 from app.models.portfolios import Portfolio
 from app.models.projects import Project
+from app.models.responsibilities import Responsibility
 from app.nlu.provider import LLMProvider, ToolCall, get_llm_provider
 from app.nlu.tools import dispatch, openai_tools
 from app.timeutils import now_local
@@ -97,6 +98,12 @@ def _system_prompt(db: Session) -> str:
             .order_by(MarketProduct.nombre)
         ).scalars()
     ]
+    responsabilidades = [
+        r.nombre
+        for r in db.execute(
+            select(Responsibility).order_by(Responsibility.nombre)
+        ).scalars()
+    ]
     return (
         "Eres Puiky, un asistente personal (un 'segundo cerebro'). Interpretas lo "
         "que dice el usuario y usas las herramientas para actuar.\n"
@@ -122,6 +129,11 @@ def _system_prompt(db: Session) -> str:
         f"- Proyectos activos: {', '.join(proyectos) or '(ninguno)'}.\n"
         f"- Productos de mercado: {', '.join(productos) or '(ninguno)'}. Para "
         "«¿qué me toca comprar?» usa que_toca_comprar.\n"
+        f"- Pagos recurrentes (responsabilidades): "
+        f"{', '.join(responsabilidades) or '(ninguno)'}. Si el usuario dice que "
+        "pagó uno de estos (p. ej. «pagué la administración», «ya pagué el "
+        "arriendo») usa pagar_responsabilidad (crea el gasto con la cuenta y "
+        "monto guardados y avanza la fecha), NO registrar_gasto.\n"
         "- Modo compra (ir al súper): «voy a comprar / arma la lista» → "
         "iniciar_compra (y agregar_sugeridos_compra para sumar lo que toca). "
         "«agrega X a la lista» → agregar_a_lista. «compré X [a tanto]» → "

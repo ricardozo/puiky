@@ -16,6 +16,8 @@ class ResponsibilityCreate(BaseModel):
     recurrencia: str = Field(description=_AYUDA_REC)
     proximo_venc: date
     monto: Decimal | None = Field(default=None, ge=0)
+    account_id: uuid.UUID | None = None
+    category_id: uuid.UUID | None = None
 
     @field_validator("recurrencia")
     @classmethod
@@ -30,6 +32,8 @@ class ResponsibilityUpdate(BaseModel):
     recurrencia: str | None = None
     proximo_venc: date | None = None
     monto: Decimal | None = Field(default=None, ge=0)
+    account_id: uuid.UUID | None = None
+    category_id: uuid.UUID | None = None
 
     @field_validator("recurrencia")
     @classmethod
@@ -37,6 +41,14 @@ class ResponsibilityUpdate(BaseModel):
         if v is not None and not es_recurrencia_valida(v):
             raise ValueError(f"Recurrencia inválida. Use: {_AYUDA_REC}")
         return v
+
+
+class ResponsibilityPay(BaseModel):
+    """Datos opcionales al registrar el pago (sobrescriben lo guardado)."""
+
+    monto: Decimal | None = Field(default=None, ge=0)
+    account_id: uuid.UUID | None = None
+    category_id: uuid.UUID | None = None
 
 
 class ResponsibilityOut(BaseModel):
@@ -47,3 +59,19 @@ class ResponsibilityOut(BaseModel):
     recurrencia: str
     proximo_venc: date
     monto: Decimal | None
+    account_id: uuid.UUID | None = None
+    category_id: uuid.UUID | None = None
+    # Nombres para mostrar (los adjunta el servicio).
+    cuenta: str | None = None
+    categoria: str | None = None
+
+
+class ResponsibilityPayResult(BaseModel):
+    """Resultado de registrar un pago: la responsabilidad avanzada y, si aplicó,
+    el gasto creado en finanzas."""
+
+    responsabilidad: ResponsibilityOut
+    gasto_creado: bool = False
+    monto: Decimal | None = None
+    cuenta: str | None = None
+    saldo_cuenta: Decimal | None = None

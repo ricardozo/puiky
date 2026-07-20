@@ -178,6 +178,17 @@ export interface Responsibility {
   recurrencia: string
   proximo_venc: string
   monto: string | null
+  account_id: string | null
+  category_id: string | null
+  cuenta: string | null
+  categoria: string | null
+}
+export interface ResponsibilityPayResult {
+  responsabilidad: Responsibility
+  gasto_creado: boolean
+  monto: string | null
+  cuenta: string | null
+  saldo_cuenta: string | null
 }
 
 export interface MarketProduct {
@@ -491,7 +502,9 @@ export const api = {
     nombre: string,
     recurrencia: string,
     proximoVenc: string,
-    monto: number | null
+    monto: number | null,
+    accountId: string | null = null,
+    categoryId: string | null = null
   ) =>
     request<Responsibility>('/responsibilities', {
       method: 'POST',
@@ -500,11 +513,18 @@ export const api = {
         recurrencia,
         proximo_venc: proximoVenc,
         monto,
+        account_id: accountId,
+        category_id: categoryId,
       }),
     }),
   fulfillResponsibility: (id: string) =>
     request<Responsibility>(`/responsibilities/${id}/fulfill`, {
       method: 'POST',
+    }),
+  payResponsibility: (id: string) =>
+    request<ResponsibilityPayResult>(`/responsibilities/${id}/pay`, {
+      method: 'POST',
+      body: JSON.stringify({}),
     }),
   deleteResponsibility: (id: string) =>
     request<void>(`/responsibilities/${id}`, { method: 'DELETE' }),
