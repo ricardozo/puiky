@@ -527,14 +527,32 @@ export const api = {
         category_id: categoryId,
       }),
     }),
+  updateResponsibility: (
+    id: string,
+    cambios: {
+      nombre?: string
+      recurrencia?: string
+      proximo_venc?: string
+      monto?: number | null
+      account_id?: string | null
+      category_id?: string | null
+    }
+  ) =>
+    request<Responsibility>(`/responsibilities/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(cambios),
+    }),
   fulfillResponsibility: (id: string) =>
     request<Responsibility>(`/responsibilities/${id}/fulfill`, {
       method: 'POST',
     }),
-  payResponsibility: (id: string) =>
+  payResponsibility: (
+    id: string,
+    override?: { monto?: number | null; account_id?: string | null; category_id?: string | null }
+  ) =>
     request<ResponsibilityPayResult>(`/responsibilities/${id}/pay`, {
       method: 'POST',
-      body: JSON.stringify({}),
+      body: JSON.stringify(override ?? {}),
     }),
   deleteResponsibility: (id: string) =>
     request<void>(`/responsibilities/${id}`, { method: 'DELETE' }),
