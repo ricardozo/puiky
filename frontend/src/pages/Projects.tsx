@@ -295,7 +295,7 @@ function Detalle({
                   e.stopPropagation()
                   mover(p.id, e.target.value)
                 }}
-                className="input opacity-0 group-hover:opacity-100 mt-3 w-auto text-xs py-1 transition"
+                className="input mt-3 w-auto text-xs py-1"
                 title="Mover a portafolio"
               >
                 <option value="">— sin portafolio —</option>
