@@ -1,8 +1,16 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { aISOColombia, api, ApiError, type Reminder } from '../api'
+import { useNavigate } from 'react-router-dom'
+import { aISOColombia, api, ApiError, type Reminder, type Task } from '../api'
 
 function efectivo(r: Reminder): string {
   return r.pospuesto_para ?? r.disparar_en
+}
+
+function hoyISO(): string {
+  const d = new Date()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${day}`
 }
 
 // Colapsa la escalera de avisos: por cada origen (responsabilidad, tarea…) deja
@@ -33,11 +41,13 @@ function mananaNueve(): string {
 export default function Recordatorios() {
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [verResueltos, setVerResueltos] = useState(false)
+  const [tareasRec, setTareasRec] = useState<Task[]>([])
   const [texto, setTexto] = useState('')
   const [cuando, setCuando] = useState('')
   const [recurrencia, setRecurrencia] = useState('')
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(true)
+  const navigate = useNavigate()
 
   // Por defecto: solo los que ya llegaron (evita mostrar la escalera de avisos
   // futuros). Con "Ver resueltos": el histórico resuelto.
@@ -50,6 +60,10 @@ export default function Recordatorios() {
     cargar()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [verResueltos])
+
+  useEffect(() => {
+    api.listRecurringTasks().then(setTareasRec)
+  }, [])
 
   const crear = async (e: FormEvent) => {
     e.preventDefault()
@@ -126,6 +140,53 @@ export default function Recordatorios() {
         <button className="btn">Crear</button>
       </form>
       {error && <p className="text-[color:var(--c-danger)] text-sm">{error}</p>}
+
+      {tareasRec.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="eyebrow">Tareas recurrentes</h3>
+          <ul className="space-y-2">
+            {tareasRec.map((t) => {
+              const venc = !!t.fecha_limite && t.fecha_limite <= hoyISO()
+              return (
+                <li
+                  key={t.id}
+                  onClick={() => t.project_id && navigate(`/proyectos/${t.project_id}`)}
+                  className="card px-4 py-3 flex items-center justify-between gap-3 cursor-pointer hover:border-teal transition"
+                >
+                  <div className="min-w-0">
+                    <p>
+                      🔁 {t.titulo}
+                      {t.proyecto && (
+                        <span className="text-faint text-sm"> · {t.proyecto}</span>
+                      )}
+                    </p>
+                    <p className="text-xs mt-1">
+                      <span className="badge text-xs">{t.recurrencia}</span>
+                      {t.fecha_limite && (
+                        <span
+                          className={
+                            venc
+                              ? 'text-[color:var(--c-danger)] ml-2'
+                              : 'text-faint ml-2'
+                          }
+                        >
+                          {venc ? '⏰ vence ' : 'vence '}
+                          {new Date(t.fecha_limite + 'T00:00').toLocaleDateString(
+                            'es-CO'
+                          )}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  {t.project_id && (
+                    <span className="text-faint text-xs shrink-0">ver tablero →</span>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
 
       {cargando ? (
         <p className="text-faint">Cargando…</p>

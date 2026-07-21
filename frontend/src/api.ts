@@ -316,6 +316,7 @@ export const api = {
   getProject: (id: string) => request<ProjectDetail>(`/projects/${id}`),
   listTasks: (q?: string) =>
     request<Task[]>(`/tasks${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+  listRecurringTasks: () => request<Task[]>('/tasks/recurrentes'),
   createProject: (nombre: string, portfolioId?: string | null) =>
     request<Project>('/projects', {
       method: 'POST',

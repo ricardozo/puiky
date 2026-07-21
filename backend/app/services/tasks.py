@@ -142,6 +142,16 @@ def list_pendientes(db: Session) -> list[Task]:
     return list(db.execute(_con_checklist(stmt)).scalars().all())
 
 
+def list_recurrentes_pendientes(db: Session) -> list[Task]:
+    """Tareas recurrentes sin terminar, por vencimiento (las sin fecha, al final)."""
+    stmt = (
+        select(Task)
+        .where(Task.estado != TERMINADA, Task.recurrencia.is_not(None))
+        .order_by(Task.fecha_limite.is_(None), Task.fecha_limite)
+    )
+    return list(db.execute(_con_checklist(stmt)).scalars().all())
+
+
 def update_task(db: Session, task_id: uuid.UUID, data: TaskUpdate) -> Task | None:
     task = get_task(db, task_id)
     if task is None:

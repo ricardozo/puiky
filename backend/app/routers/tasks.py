@@ -77,6 +77,12 @@ def tareas_pendientes(db: Session = Depends(get_db)) -> list[TaskOut]:
     return service.list_pendientes(db)
 
 
+@router.get("/recurrentes", response_model=list[TaskOut])
+def tareas_recurrentes(db: Session = Depends(get_db)) -> list[TaskOut]:
+    """Tareas recurrentes sin terminar (para la vista de recordatorios)."""
+    return service.list_recurrentes_pendientes(db)
+
+
 @router.get("/{task_id}", response_model=TaskOut)
 def ver_tarea(task_id: uuid.UUID, db: Session = Depends(get_db)) -> TaskOut:
     tarea = service.get_task(db, task_id)
