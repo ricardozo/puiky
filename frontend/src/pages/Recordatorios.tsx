@@ -22,9 +22,10 @@ export default function Recordatorios() {
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(true)
 
+  // Por defecto: solo los que ya llegaron (evita mostrar la escalera de avisos
+  // futuros). Con "Ver resueltos": el histórico resuelto.
   const cargar = () =>
-    api
-      .listReminders(verResueltos ? undefined : false)
+    (verResueltos ? api.listReminders(true) : api.listDueReminders())
       .then(setReminders)
       .finally(() => setCargando(false))
 

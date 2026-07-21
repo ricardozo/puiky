@@ -491,6 +491,8 @@ export const api = {
     request<Reminder[]>(
       `/reminders${resuelto === undefined ? '' : `?resuelto=${resuelto}`}`
     ),
+  // Solo los que ya "llegaron" (disparo efectivo <= ahora), sin resolver.
+  listDueReminders: () => request<Reminder[]>('/reminders/vencidos'),
   createReminder: (texto: string, dispararEn: string) =>
     request<Reminder>('/reminders', {
       method: 'POST',
