@@ -57,7 +57,13 @@ function Home({
   }
   return (
     <div className="space-y-6">
-      <h2 className="font-serif text-2xl">Proyectos</h2>
+      <div>
+        <h2 className="font-serif text-2xl">Portafolios</h2>
+        <p className="text-sm text-muted mt-1">
+          Un portafolio agrupa proyectos relacionados (un cliente, un área, un
+          objetivo). Ábrelo para ver y crear sus proyectos.
+        </p>
+      </div>
       <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
         <button
           onClick={() => onAbrir({ tipo: 'todos' })}
@@ -216,6 +222,11 @@ function Detalle({
           </div>
         )}
       </div>
+
+      <p className="text-sm text-muted">
+        Un proyecto agrupa tareas hacia un objetivo, con su avance, fechas y notas.
+        Ábrelo para ver su tablero.
+      </p>
 
       <form onSubmit={crear} className="flex gap-2 max-w-xl">
         <input
