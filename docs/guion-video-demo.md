@@ -138,16 +138,38 @@ Haces mercado, marcas lo que compraste<break time="200ms"/> y el gasto queda reg
 
 ---
 
-## La nota de voz exacta (para grabar el bot al primer intento)
+## Guion del bot (Telegram) — secuencia de una sola toma
 
-Dile al bot, tal cual:
-> *"Gasté cuarenta y cinco mil en el almuerzo con Bancolombia, y recuérdame enviar la cuenta de cobro cada mes."*
+Con los datos demo ya sembrados. **Antes de grabar:** limpia el historial del chat
+(en Telegram: nombre del bot → "Limpiar historial") y empieza la toma en `/start`.
 
-Luego escribe:
-> *"¿Qué tengo pendiente?"*
+**0 · Arranque limpio**
+- Envía: **`/start`** → sale la bienvenida de Puiky. Corta y empieza la toma.
 
-*(Con el usuario demo, ambas respuestas salen limpias y muestran gasto + recordatorio
-recurrente + lista de pendientes.)*
+**1 · El "wow": una nota de VOZ que hace dos cosas** *(el corazón del video)*
+> 🎙️ *"Gasté cuarenta y cinco mil en el almuerzo con Bancolombia, y recuérdame enviar la cuenta de cobro cada mes."*
+
+→ confirma el **gasto** + el **recordatorio recurrente**.
+
+**2 · La pregunta estrella (texto)**
+> **¿Qué tengo pendiente?**
+
+→ tareas por proyecto (con **Cuenta de cobro COLEF 🔁**) + recordatorios.
+
+### Extras opcionales (elige 1–2 para más variedad)
+
+**3 · Mercado:** `¿Qué me toca comprar?` → Leche, Huevos, Pan, Papel higiénico…
+**4 · Pago recurrente:** `Pagué la administración` → gasto de $270.000 desde Bancolombia y avanza la fecha.
+**5 · Nota por voz:** 🎙️ *"Anota que tengo que llamar al proveedor de la cocina el viernes."*
+
+### Para que salga limpio
+
+- La nota de voz #1 hace **2 acciones**; si Qwen se demora o falla, pártela en dos
+  mensajes (primero el gasto, luego el recordatorio). En edición no se nota.
+- **Dicta "mil" separado** (nunca pegado, «130mil») para que la magnitud salga perfecta.
+- Deja cada respuesta **1–2 s** en pantalla antes de cortar; luego aceleras en edición.
+- **No** muestres la confirmación de montos altos aquí — es una red de seguridad, no un
+  punto de venta; el video debe fluir positivo.
 
 ---
 
