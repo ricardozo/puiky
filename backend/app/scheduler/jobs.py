@@ -202,7 +202,11 @@ async def entregar_pendientes(
     `realert_hours` (via pospuesto_para) para que vuelva hasta que se resuelva."""
     if not chat_ids:
         return 0
-    efectivo = func.coalesce(Reminder.pospuesto_para, Reminder.disparar_en)
+    # Cadencia del bot: respeta el snooze del usuario (pospuesto_para) y su propia
+    # marca de re-aviso (proximo_aviso), sin pisar una con la otra.
+    efectivo = func.coalesce(
+        Reminder.proximo_aviso, Reminder.pospuesto_para, Reminder.disparar_en
+    )
     due = db.execute(
         select(Reminder)
         .where(Reminder.resuelto.is_(False), efectivo <= ahora)
@@ -213,7 +217,7 @@ async def entregar_pendientes(
         for chat_id in chat_ids:
             await notifier.send(chat_id, r.texto)
         r.veces_avisado += 1
-        r.pospuesto_para = ahora + timedelta(hours=realert_hours)
+        r.proximo_aviso = ahora + timedelta(hours=realert_hours)
     if due:
         db.commit()
     return len(due)

@@ -34,7 +34,14 @@ class Reminder(Base):
     veces_avisado: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=text("0")
     )
+    # Posposición del USUARIO ("recuérdame mañana"): esconde el aviso de la web
+    # y retrasa el bot hasta esa hora.
     pospuesto_para: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Cadencia de re-aviso del SCHEDULER (bot). Separado de pospuesto_para para
+    # que la web siga mostrando lo vencido entre un aviso y el siguiente.
+    proximo_aviso: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     resuelto: Mapped[bool] = mapped_column(
