@@ -30,6 +30,28 @@ _OBJ = re.compile(r"\{(?:[^{}]|\{[^{}]*\})*\}")
 
 _RECUERDAME = re.compile(r"\brecu[eé]rdame\b", re.IGNORECASE)
 
+# «130mil» pegado → «130 mil» (el modelo lo lee mucho mejor separado).
+_PEGADO = re.compile(r"(\d)(mil\b|mill[oó]n(?:es)?\b)", re.IGNORECASE)
+# Números dichos «en miles» y mención de millones, para validar magnitudes.
+_N_MIL = re.compile(r"\b(\d+)\s*mil\b", re.IGNORECASE)
+_MILLON = re.compile(r"mill[oó]n", re.IGNORECASE)
+_TOOLS_MONTO = {"registrar_gasto", "registrar_ingreso", "transferir", "pagar_responsabilidad"}
+
+
+def _corregir_magnitud(texto: str, tc: ToolCall) -> None:
+    """Si el usuario dijo «N mil» (sin mencionar millones) y el modelo puso
+    N × 1.000.000, corrige a N × 1.000. Muta los argumentos del tool call."""
+    if tc.name not in _TOOLS_MONTO or _MILLON.search(texto):
+        return
+    try:
+        monto = float(tc.arguments.get("monto") or 0)
+    except (TypeError, ValueError):
+        return
+    for n in _N_MIL.findall(texto):
+        if monto == float(n) * 1_000_000:
+            tc.arguments["monto"] = int(n) * 1000
+            return
+
 
 def _corregir_tool_calls(texto: str, calls: list[ToolCall]) -> list[ToolCall]:
     """Correcciones deterministas de fallos conocidos del modelo.
@@ -45,6 +67,7 @@ def _corregir_tool_calls(texto: str, calls: list[ToolCall]) -> list[ToolCall]:
                 args["recurrencia"] = tc.arguments["recurrencia"]
             out.append(ToolCall(name="crear_recordatorio", arguments=args))
         else:
+            _corregir_magnitud(texto, tc)
             out.append(tc)
     return out
 
@@ -185,6 +208,8 @@ def interpret(
     historial: list | None = None,
 ) -> InterpretResult:
     provider = provider or get_llm_provider()
+    # «130mil» → «130 mil»: separado, el modelo interpreta bien la magnitud.
+    texto = _PEGADO.sub(r"\1 \2", texto)
     tools = openai_tools()
     messages: list[dict] = [{"role": "system", "content": _system_prompt(db)}]
     # Memoria de conversación: turnos previos (para aclaraciones y contexto).
