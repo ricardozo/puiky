@@ -28,6 +28,26 @@ from app.timeutils import now_local
 # Objeto JSON con posible anidación de un nivel (para {"name":..,"arguments":{..}})
 _OBJ = re.compile(r"\{(?:[^{}]|\{[^{}]*\})*\}")
 
+_RECUERDAME = re.compile(r"\brecu[eé]rdame\b", re.IGNORECASE)
+
+
+def _corregir_tool_calls(texto: str, calls: list[ToolCall]) -> list[ToolCall]:
+    """Correcciones deterministas de fallos conocidos del modelo.
+
+    «Recuérdame…» debe ser un recordatorio, pero Qwen a veces lo convierte en
+    responsabilidad (con fechas alucinadas). Aquí se reencauza sin depender del
+    prompt. No se pasa la fecha del modelo: el handler usa 'ahora' por defecto."""
+    out: list[ToolCall] = []
+    for tc in calls:
+        if tc.name == "crear_responsabilidad" and _RECUERDAME.search(texto):
+            args: dict = {"texto": tc.arguments.get("nombre") or texto}
+            if tc.arguments.get("recurrencia"):
+                args["recurrencia"] = tc.arguments["recurrencia"]
+            out.append(ToolCall(name="crear_recordatorio", arguments=args))
+        else:
+            out.append(tc)
+    return out
+
 
 def _tool_calls_desde_texto(content: str | None) -> list[ToolCall]:
     """Rescata tool calls que el modelo emitió como TEXTO en vez de usar el canal
@@ -141,6 +161,11 @@ def _system_prompt(db: Session) -> str:
         "pagó uno de estos (p. ej. «pagué la administración», «ya pagué el "
         "arriendo») usa pagar_responsabilidad (crea el gasto con la cuenta y "
         "monto guardados y avanza la fecha), NO registrar_gasto.\n"
+        "- «Recuérdame <algo>» es SIEMPRE crear_recordatorio (con recurrencia "
+        "si dice «cada mes/semana/día/año»; disparar_en cercano: hoy o mañana "
+        "si no dan fecha), NUNCA crear_responsabilidad. Una responsabilidad "
+        "solo se crea si piden explícitamente una responsabilidad o un pago "
+        "recurrente con monto.\n"
         "- Modo compra (ir al súper): «voy a comprar / arma la lista» → "
         "iniciar_compra (y agregar_sugeridos_compra para sumar lo que toca). "
         "«agrega X a la lista» → agregar_a_lista. «compré X [a tanto]» → "
@@ -176,6 +201,7 @@ def interpret(
     tool_calls = resp.tool_calls or _tool_calls_desde_texto(resp.content)
     if not tool_calls:
         return InterpretResult(respuesta=resp.content or "")
+    tool_calls = _corregir_tool_calls(texto, tool_calls)
 
     # Registra la decisión del modelo (necesario para adjuntar los resultados).
     messages.append(
