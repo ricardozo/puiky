@@ -303,6 +303,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ nombre, descripcion: descripcion || null }),
     }),
+  updateNotebook: (id: string, data: { nombre?: string; descripcion?: string | null }) =>
+    request<Notebook>(`/notebooks/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
   deleteNotebook: (id: string) =>
     request<void>(`/notebooks/${id}`, { method: 'DELETE' }),
 

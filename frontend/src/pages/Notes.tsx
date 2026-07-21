@@ -88,6 +88,7 @@ export default function Notes() {
     <Detalle
       sel={sel}
       nombreCuaderno={nombreCuaderno}
+      onCambio={cargarNotebooks}
       onVolver={() => {
         cargarNotebooks()
         setSel({ tipo: 'home' })
@@ -235,26 +236,41 @@ function SpecialCard({ titulo, onClick }: { titulo: string; onClick: () => void 
 function Detalle({
   sel,
   nombreCuaderno,
+  onCambio,
   onVolver,
   onNueva,
   onAbrirNota,
 }: {
   sel: Seleccion
   nombreCuaderno: (id: string | null) => string | null
+  onCambio: () => void
   onVolver: () => void
   onNueva: (notebookId: string | null) => void
   onAbrirNota: (n: Note) => void
 }) {
   const [notas, setNotas] = useState<Note[]>([])
   const [cargando, setCargando] = useState(true)
+  const [editandoNb, setEditandoNb] = useState(false)
+  const [nombreNb, setNombreNb] = useState(
+    sel.tipo === 'cuaderno' ? sel.nb.nombre : ''
+  )
 
   const nbId = sel.tipo === 'cuaderno' ? sel.nb.id : null
+  const esProyecto = sel.tipo === 'cuaderno' && !!sel.nb.es_proyecto
   const titulo =
     sel.tipo === 'cuaderno'
-      ? sel.nb.nombre
+      ? nombreNb
       : sel.tipo === 'sin'
         ? 'Sin cuaderno'
         : 'Todas las notas'
+
+  const renombrarNb = async (e: FormEvent) => {
+    e.preventDefault()
+    if (sel.tipo !== 'cuaderno' || !nombreNb.trim()) return
+    await api.updateNotebook(sel.nb.id, { nombre: nombreNb.trim() })
+    setEditandoNb(false)
+    onCambio()
+  }
 
   const cargar = useCallback(() => {
     const opts =
@@ -277,7 +293,43 @@ function Detalle({
           <button onClick={onVolver} className="text-muted hover:text-ink text-sm">
             ← Cuadernos
           </button>
-          <h2 className="font-serif text-2xl">📓 {titulo}</h2>
+          {sel.tipo === 'cuaderno' && editandoNb ? (
+            <form onSubmit={renombrarNb} className="flex items-center gap-2">
+              <input
+                value={nombreNb}
+                onChange={(e) => setNombreNb(e.target.value)}
+                autoFocus
+                className="input w-auto text-lg"
+              />
+              <button className="btn text-sm py-1">Guardar</button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (sel.tipo === 'cuaderno') setNombreNb(sel.nb.nombre)
+                  setEditandoNb(false)
+                }}
+                className="btn-ghost btn text-sm py-1"
+              >
+                Cancelar
+              </button>
+            </form>
+          ) : (
+            <div className="flex items-center gap-2">
+              <h2 className="font-serif text-2xl">📓 {titulo}</h2>
+              {sel.tipo === 'cuaderno' &&
+                (esProyecto ? (
+                  <span className="pill pill-active text-xs">Proyecto</span>
+                ) : (
+                  <button
+                    onClick={() => setEditandoNb(true)}
+                    className="text-faint hover:text-brand text-sm"
+                    title="Renombrar cuaderno"
+                  >
+                    ✎
+                  </button>
+                ))}
+            </div>
+          )}
         </div>
         <button onClick={() => onNueva(nbId)} className="btn text-sm">
           + Nueva hoja
