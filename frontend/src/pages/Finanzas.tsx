@@ -341,6 +341,7 @@ export default function Finanzas() {
         nombreCategoria={nombreCategoria}
         onCambio={cargar}
       />
+      <Categorias categories={categories} onCambio={cargar} />
     </div>
   )
 }
@@ -771,6 +772,136 @@ function Presupuestos({
         </select>
         <button className="btn">Crear</button>
       </form>
+    </section>
+  )
+}
+
+// --- Gestión de categorías ---
+
+function Categorias({
+  categories,
+  onCambio,
+}: {
+  categories: Category[]
+  onCambio: () => void
+}) {
+  const [nombre, setNombre] = useState('')
+  const [error, setError] = useState('')
+  const [editId, setEditId] = useState<string | null>(null)
+  const [editNombre, setEditNombre] = useState('')
+
+  const crear = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!nombre.trim()) return
+    setError('')
+    try {
+      await api.createCategory(nombre.trim())
+      setNombre('')
+      onCambio()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo crear')
+    }
+  }
+
+  const renombrar = async (id: string) => {
+    if (!editNombre.trim()) return
+    setError('')
+    try {
+      await api.updateCategory(id, { nombre: editNombre.trim() })
+      setEditId(null)
+      onCambio()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo renombrar')
+    }
+  }
+
+  const archivar = async (c: Category) => {
+    await api.updateCategory(c.id, { activa: !c.activa })
+    onCambio()
+  }
+
+  const activas = categories.filter((c) => c.activa)
+  const archivadas = categories.filter((c) => !c.activa)
+
+  const Chip = ({ c }: { c: Category }) =>
+    editId === c.id ? (
+      <span className="inline-flex items-center gap-1 rounded-full border border-teal bg-surface px-2 py-1">
+        <input
+          autoFocus
+          value={editNombre}
+          onChange={(e) => setEditNombre(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') renombrar(c.id)
+            if (e.key === 'Escape') setEditId(null)
+          }}
+          className="input h-7 w-32 py-0 text-sm"
+        />
+        <button onClick={() => renombrar(c.id)} className="text-[color:var(--c-green)]" title="Guardar">
+          ✓
+        </button>
+        <button onClick={() => setEditId(null)} className="text-faint" title="Cancelar">
+          ✕
+        </button>
+      </span>
+    ) : (
+      <span
+        className={`group inline-flex items-center gap-2 rounded-full border border-line px-3 py-1 text-sm ${
+          c.activa ? '' : 'opacity-50'
+        }`}
+      >
+        <span className={c.activa ? '' : 'line-through'}>{c.nombre}</span>
+        <button
+          onClick={() => {
+            setEditId(c.id)
+            setEditNombre(c.nombre)
+          }}
+          className="text-faint hover:text-brand transition"
+          title="Renombrar"
+        >
+          ✎
+        </button>
+        <button
+          onClick={() => archivar(c)}
+          className="text-faint hover:text-ink transition"
+          title={c.activa ? 'Archivar' : 'Reactivar'}
+        >
+          {c.activa ? '🗄' : '↩'}
+        </button>
+      </span>
+    )
+
+  return (
+    <section className="space-y-3">
+      <h3 className="eyebrow">Categorías</h3>
+      <p className="text-xs text-faint">
+        Archivar no borra el histórico: la categoría deja de aparecer al registrar,
+        pero los movimientos que ya la usan la conservan.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {activas.map((c) => (
+          <Chip key={c.id} c={c} />
+        ))}
+      </div>
+      {archivadas.length > 0 && (
+        <div className="space-y-1.5 pt-1">
+          <p className="text-xs text-faint">Archivadas</p>
+          <div className="flex flex-wrap gap-2">
+            {archivadas.map((c) => (
+              <Chip key={c.id} c={c} />
+            ))}
+          </div>
+        </div>
+      )}
+      <form onSubmit={crear} className="flex flex-wrap gap-2 pt-1">
+        <input
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+          placeholder="Nueva categoría"
+          className="input w-auto"
+        />
+        <button className="btn">Añadir</button>
+      </form>
+      {error && <p className={`${rojo} text-sm`}>{error}</p>}
     </section>
   )
 }

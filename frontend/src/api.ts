@@ -376,6 +376,16 @@ export const api = {
     }),
   listCategories: (soloActivas = true) =>
     request<Category[]>(`/categories?solo_activas=${soloActivas}`),
+  createCategory: (nombre: string) =>
+    request<Category>('/categories', {
+      method: 'POST',
+      body: JSON.stringify({ nombre }),
+    }),
+  updateCategory: (id: string, cambios: { nombre?: string; activa?: boolean }) =>
+    request<Category>(`/categories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(cambios),
+    }),
   listTransactions: (filtro?: {
     accountId?: string
     categoryId?: string
