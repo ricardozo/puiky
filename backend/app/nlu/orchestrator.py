@@ -113,6 +113,8 @@ def _system_prompt(db: Session) -> str:
         "para una idea nueva usa 'crear_hoja'.\n"
         f"- Fecha y hora actual: {ahora} (hora de Colombia). Convierte 'mañana', "
         "'el viernes', etc. a fechas/horas ISO 8601 con offset -05:00.\n"
+        "- Al listar tareas, si una trae el campo 'recurrente', indícalo con 🔁 y "
+        "su periodicidad (p. ej. «Cuenta de cobro COLEF 🔁 recurrente (mensual)»).\n"
         f"- Cuadernos: {', '.join(cuadernos) or '(ninguno)'}.\n"
         f"- Categorías: {', '.join(categorias) or '(ninguna)'}. Mapea expresiones "
         "libres ('mercado', 'súper') a la más adecuada; si ninguna aplica, 'Otros'.\n"

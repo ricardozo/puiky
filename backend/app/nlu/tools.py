@@ -408,12 +408,17 @@ def _listar_tareas_pendientes(db: Session, a: dict) -> dict:
 
 
 def _resumen_tarea(t: Task) -> dict:
-    return {
+    d = {
         "titulo": t.titulo,
         "proyecto": t.proyecto,
         "estado": t.estado,
         "avance_pct": t.avance_pct,
     }
+    if t.recurrencia:
+        d["recurrente"] = t.recurrencia
+    if t.fecha_limite:
+        d["fecha_limite"] = t.fecha_limite.isoformat()
+    return d
 
 
 _FECHAS_TAREA = [
