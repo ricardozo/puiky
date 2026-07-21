@@ -218,22 +218,18 @@ export default function Finanzas() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [budgets, setBudgets] = useState<BudgetProgress[]>([])
   const [cargando, setCargando] = useState(true)
   const [vista, setVista] = useState<Vista>({ tipo: 'panel' })
 
   const cargar = useCallback(async () => {
-    const [acc, cats, txs, buds] = await Promise.all([
+    const [acc, cats, txs] = await Promise.all([
       api.listAccounts(),
       api.listCategories(false),
       api.listTransactions(),
-      api.listBudgets(),
     ])
-    const prog = await Promise.all(buds.map((b) => api.budgetProgress(b.id)))
     setAccounts(acc)
     setCategories(cats)
     setTransactions(txs)
-    setBudgets(prog)
     setCargando(false)
   }, [])
 
@@ -341,12 +337,7 @@ export default function Finanzas() {
         nombreCategoria={nombreCategoria}
         onCambio={cargar}
       />
-      <Presupuestos
-        budgets={budgets}
-        categories={categories}
-        nombreCategoria={nombreCategoria}
-        onCambio={cargar}
-      />
+      <Presupuestos categories={categories} nombreCategoria={nombreCategoria} />
       <Categorias categories={categories} onCambio={cargar} />
     </div>
   )
@@ -775,37 +766,82 @@ function Movimientos({
 // --- Presupuestos ---
 
 function Presupuestos({
-  budgets,
   categories,
   nombreCategoria,
-  onCambio,
 }: {
-  budgets: BudgetProgress[]
   categories: Category[]
   nombreCategoria: (id: string | null) => string
-  onCambio: () => void
 }) {
+  const [ref, setRef] = useState(() => {
+    const d = new Date()
+    return new Date(d.getFullYear(), d.getMonth(), 1)
+  })
+  const [budgets, setBudgets] = useState<BudgetProgress[]>([])
   const [tope, setTope] = useState('')
   const [categoria, setCategoria] = useState('')
+
+  const recargar = useCallback(async () => {
+    const buds = await api.listBudgets()
+    const prog = await Promise.all(
+      buds.map((b) => api.budgetProgress(b.id, ref.getFullYear(), ref.getMonth() + 1))
+    )
+    setBudgets(prog)
+  }, [ref])
+
+  useEffect(() => {
+    recargar()
+  }, [recargar])
+
+  const cambiarMes = (delta: number) =>
+    setRef(new Date(ref.getFullYear(), ref.getMonth() + delta, 1))
 
   const crear = async (e: FormEvent) => {
     e.preventDefault()
     if (!tope) return
     await api.createBudget(Number(tope), categoria || null)
     setTope('')
-    onCambio()
+    recargar()
   }
   const eliminar = async (id: string) => {
     if (!window.confirm('¿Eliminar este presupuesto?')) return
     await api.deleteBudget(id)
-    onCambio()
+    recargar()
   }
 
   return (
     <section className="space-y-3">
-      <h3 className="eyebrow">Presupuestos del mes</h3>
-      <div className="space-y-3">
-        {budgets.map((b) => {
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="eyebrow">Presupuestos</h3>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => cambiarMes(-1)}
+            className="rounded-lg border border-line px-2 py-0.5 text-muted hover:text-ink hover:bg-surface transition"
+            title="Mes anterior"
+          >
+            ◀
+          </button>
+          <span className="text-sm font-medium min-w-32 text-center">
+            {etiquetaMes(ref)}
+          </span>
+          <button
+            onClick={() => cambiarMes(1)}
+            className="rounded-lg border border-line px-2 py-0.5 text-muted hover:text-ink hover:bg-surface transition"
+            title="Mes siguiente"
+          >
+            ▶
+          </button>
+        </div>
+      </div>
+      <p className="text-xs text-faint">
+        Gasto real de {etiquetaMes(ref).toLowerCase()} comparado con tu tope actual.
+      </p>
+      {budgets.length === 0 ? (
+        <p className="text-faint text-sm">
+          Sin presupuestos. Crea uno abajo: un tope mensual, por categoría o global.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {budgets.map((b) => {
           const pct = Math.min(b.porcentaje, 100)
           const alerta = b.porcentaje >= 90
           return (
@@ -836,7 +872,8 @@ function Presupuestos({
             </div>
           )
         })}
-      </div>
+        </div>
+      )}
       <form onSubmit={crear} className="flex flex-wrap gap-2">
         <input
           value={tope}

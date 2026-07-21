@@ -415,8 +415,13 @@ export const api = {
   deleteTransaction: (id: string) =>
     request<void>(`/transactions/${id}`, { method: 'DELETE' }),
   listBudgets: () => request<Budget[]>('/budgets'),
-  budgetProgress: (id: string) =>
-    request<BudgetProgress>(`/budgets/${id}/progreso`),
+  budgetProgress: (id: string, anio?: number, mes?: number) => {
+    const p = new URLSearchParams()
+    if (anio) p.set('anio', String(anio))
+    if (mes) p.set('mes', String(mes))
+    const qs = p.toString()
+    return request<BudgetProgress>(`/budgets/${id}/progreso${qs ? `?${qs}` : ''}`)
+  },
   createBudget: (tope: number, categoryId: string | null) =>
     request<Budget>('/budgets', {
       method: 'POST',
