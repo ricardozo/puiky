@@ -15,6 +15,12 @@ from app.schemas.responsibilities import (
 )
 from app.services import finances as fin
 from app.services.recurrence import siguiente_vencimiento
+from app.timeutils import now_local
+
+_MESES = (
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+)
 
 
 def _categoria_otros(db: Session) -> Category:
@@ -117,6 +123,7 @@ def pay_responsibility(
     tx: Transaction | None = None
     if account_id is not None and monto is not None and monto > 0:
         category_id = data.category_id or resp.category_id or _categoria_otros(db).id
+        mes = _MESES[now_local().month - 1]
         tx = fin.create_transaction(
             db,
             TransactionCreate(
@@ -124,7 +131,7 @@ def pay_responsibility(
                 monto=monto,
                 account_id=account_id,
                 category_id=category_id,
-                nota=f"Pago: {resp.nombre}",
+                nota=f"Pago: {resp.nombre} {mes}",
             ),
         )
 
