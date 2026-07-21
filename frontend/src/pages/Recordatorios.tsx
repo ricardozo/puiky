@@ -1,8 +1,24 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { aISOColombia, api, ApiError, type Reminder } from '../api'
 
 function efectivo(r: Reminder): string {
   return r.pospuesto_para ?? r.disparar_en
+}
+
+// Colapsa la escalera de avisos: por cada origen (responsabilidad, tarea…) deja
+// solo el más reciente/urgente. Los manuales (sin origen) quedan tal cual.
+function colapsarPorOrigen(reminders: Reminder[]): Reminder[] {
+  const porOrigen = new Map<string, Reminder>()
+  for (const r of reminders) {
+    const key = r.origen_id ? `${r.origen_tipo}:${r.origen_id}` : `manual:${r.id}`
+    const prev = porOrigen.get(key)
+    if (!prev || new Date(efectivo(r)) > new Date(efectivo(prev))) {
+      porOrigen.set(key, r)
+    }
+  }
+  return [...porOrigen.values()].sort(
+    (a, b) => new Date(efectivo(a)).getTime() - new Date(efectivo(b)).getTime()
+  )
 }
 
 function mananaNueve(): string {
@@ -55,6 +71,13 @@ export default function Recordatorios() {
 
   const ahora = Date.now()
 
+  // Vista por defecto: escalera colapsada a un aviso por origen. Con "Ver
+  // resueltos" mostramos el histórico completo, sin colapsar.
+  const visibles = useMemo(
+    () => (verResueltos ? reminders : colapsarPorOrigen(reminders)),
+    [reminders, verResueltos]
+  )
+
   return (
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center justify-between">
@@ -91,11 +114,11 @@ export default function Recordatorios() {
 
       {cargando ? (
         <p className="text-faint">Cargando…</p>
-      ) : reminders.length === 0 ? (
+      ) : visibles.length === 0 ? (
         <p className="text-faint">Sin recordatorios.</p>
       ) : (
         <ul className="space-y-2">
-          {reminders.map((r) => {
+          {visibles.map((r) => {
             const venc = new Date(efectivo(r)).getTime() <= ahora && !r.resuelto
             return (
               <li
