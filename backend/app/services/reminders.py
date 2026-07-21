@@ -6,6 +6,7 @@ los datos y las operaciones.
 """
 
 import uuid
+from datetime import datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -15,6 +16,7 @@ from app.models.reminders import Reminder
 from app.models.responsibilities import Responsibility
 from app.models.tasks import Task
 from app.schemas.reminders import ReminderCreate, ReminderUpdate
+from app.services.recurrence import siguiente_vencimiento
 
 # origen_tipo -> modelo, para validar que el origen exista.
 _MODELOS_ORIGEN = {
@@ -34,6 +36,7 @@ def create_reminder(db: Session, data: ReminderCreate) -> Reminder:
         disparar_en=data.disparar_en,
         origen_tipo=data.origen_tipo.value if data.origen_tipo else None,
         origen_id=data.origen_id,
+        recurrencia=data.recurrencia,
     )
     db.add(reminder)
     db.commit()
@@ -106,10 +109,23 @@ def mark_notified(db: Session, reminder_id: uuid.UUID) -> Reminder | None:
 
 
 def resolve_reminder(db: Session, reminder_id: uuid.UUID) -> Reminder | None:
+    """Resuelve el recordatorio. Si es recurrente, en vez de cerrarlo lo reprograma
+    para el siguiente periodo (y limpia el estado de aviso), para que reaparezca."""
     reminder = db.get(Reminder, reminder_id)
     if reminder is None:
         return None
-    reminder.resuelto = True
+    if reminder.recurrencia:
+        base = reminder.pospuesto_para or reminder.disparar_en
+        siguiente = siguiente_vencimiento(base.date(), reminder.recurrencia)
+        reminder.disparar_en = datetime.combine(
+            siguiente, reminder.disparar_en.timetz()
+        )
+        reminder.pospuesto_para = None
+        reminder.proximo_aviso = None
+        reminder.veces_avisado = 0
+        reminder.resuelto = False
+    else:
+        reminder.resuelto = True
     db.commit()
     db.refresh(reminder)
     return reminder

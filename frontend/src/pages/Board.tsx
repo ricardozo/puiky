@@ -39,7 +39,10 @@ function Card({ task, onAbrir }: { task: Task; onAbrir: (t: Task) => void }) {
         isDragging ? 'opacity-50' : ''
       }`}
     >
-      <div className="text-sm">{task.titulo}</div>
+      <div className="text-sm">
+        {task.recurrencia && <span title={`Recurrente: ${task.recurrencia}`}>🔁 </span>}
+        {task.titulo}
+      </div>
       {task.checklist.length > 0 && (
         <div className="text-xs text-muted mt-1.5">
           ☑ {hechos(task)}/{task.checklist.length}
@@ -100,6 +103,15 @@ const hoyISO = () => {
   const day = String(d.getDate()).padStart(2, '0')
   return `${d.getFullYear()}-${m}-${day}`
 }
+
+const RECURRENCIAS = [
+  { v: '', label: 'No se repite' },
+  { v: 'diaria', label: 'Diaria' },
+  { v: 'semanal', label: 'Semanal' },
+  { v: 'mensual', label: 'Mensual' },
+  { v: 'trimestral', label: 'Trimestral' },
+  { v: 'anual', label: 'Anual' },
+]
 
 function ProjectHeader({
   project,
@@ -393,6 +405,26 @@ export function TaskEditor({
             </button>
           )}
         </div>
+
+        <label className="text-xs text-muted flex flex-wrap items-center gap-2">
+          Recurrencia
+          <select
+            value={task.recurrencia ?? ''}
+            onChange={(e) => guardar({ recurrencia: e.target.value || null })}
+            className="input w-auto py-1 text-sm"
+          >
+            {RECURRENCIAS.map((r) => (
+              <option key={r.v} value={r.v}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+          {task.recurrencia && (
+            <span className="text-faint">
+              Al completarla vuelve el siguiente periodo (avanza el fin planeado).
+            </span>
+          )}
+        </label>
 
         <label className="text-xs text-muted flex flex-col gap-1">
           Descripción

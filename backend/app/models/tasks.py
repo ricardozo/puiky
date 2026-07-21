@@ -53,6 +53,9 @@ class Task(Base):
     fecha_inicio_plan: Mapped[date | None] = mapped_column(Date, nullable=True)
     fecha_inicio_real: Mapped[date | None] = mapped_column(Date, nullable=True)
     fecha_fin_real: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Si está definida, al completar la tarea se reinicia y su fecha_limite avanza
+    # al siguiente periodo. Gramática: diaria|semanal|mensual|...|cada_N_dias.
+    recurrencia: Mapped[str | None] = mapped_column(String(30), nullable=True)
 
     project: Mapped["Project | None"] = relationship(  # noqa: F821
         back_populates="tasks"

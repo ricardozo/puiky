@@ -710,9 +710,19 @@ def _crear_recordatorio(db: Session, a: dict) -> dict:
         else datetime.now().astimezone()
     )
     r = rem_svc.create_reminder(
-        db, ReminderCreate(texto=a["texto"], disparar_en=disparar)
+        db,
+        ReminderCreate(
+            texto=a["texto"],
+            disparar_en=disparar,
+            recurrencia=a.get("recurrencia"),
+        ),
     )
-    return {"ok": True, "texto": r.texto, "disparar_en": r.disparar_en.isoformat()}
+    return {
+        "ok": True,
+        "texto": r.texto,
+        "disparar_en": r.disparar_en.isoformat(),
+        "recurrencia": r.recurrencia,
+    }
 
 
 def _crear_responsabilidad(db: Session, a: dict) -> dict:
@@ -859,6 +869,15 @@ def _listar_recordatorios(db: Session, a: dict) -> dict:
 
 def _recordatorios_vencidos(db: Session, a: dict) -> dict:
     return {"ok": True, "recordatorios": [r.texto for r in rem_svc.list_due(db)]}
+
+
+def _que_tengo_pendiente(db: Session, a: dict) -> dict:
+    """Resumen de lo pendiente: tareas sin terminar + recordatorios ya vencidos."""
+    return {
+        "ok": True,
+        "tareas": [_resumen_tarea(t) for t in task_svc.list_pendientes(db)],
+        "recordatorios": [r.texto for r in rem_svc.list_due(db)],
+    }
 
 
 def _posponer_recordatorio(db: Session, a: dict) -> dict:
@@ -1361,8 +1380,14 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         "crear_recordatorio",
-        "Crea un recordatorio. `disparar_en` en ISO 8601 (usa la fecha/hora actual del contexto).",
-        _p({"texto": _STR, "disparar_en": _STR}, ["texto"]),
+        "Crea un recordatorio. `disparar_en` en ISO 8601 (usa la fecha/hora actual "
+        "del contexto). `recurrencia` opcional (diaria|semanal|mensual|trimestral|"
+        "anual|cada_N_dias): si se da, al resolverlo reaparece el siguiente periodo "
+        "(p. ej. «recuérdame cada mes enviar la cuenta de cobro»).",
+        _p(
+            {"texto": _STR, "disparar_en": _STR, "recurrencia": _STR},
+            ["texto"],
+        ),
         _crear_recordatorio,
     ),
     Tool(
@@ -1449,6 +1474,13 @@ TOOLS: list[Tool] = [
         "Lista los recordatorios cuyo momento ya llegó y siguen sin resolver.",
         _p({}, []),
         _recordatorios_vencidos,
+    ),
+    Tool(
+        "que_tengo_pendiente",
+        "Resumen de TODO lo pendiente: tareas sin terminar + recordatorios ya "
+        "vencidos. Úsalo para «¿qué tengo pendiente?», «¿qué me falta?», «mi día».",
+        _p({}, []),
+        _que_tengo_pendiente,
     ),
     Tool(
         "posponer_recordatorio",

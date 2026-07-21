@@ -44,6 +44,9 @@ class Reminder(Base):
     proximo_aviso: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Si está definida, al resolver el recordatorio reaparece en el siguiente
+    # periodo. Gramática: diaria|semanal|mensual|...|cada_N_dias.
+    recurrencia: Mapped[str | None] = mapped_column(String(30), nullable=True)
     resuelto: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")
     )

@@ -4,7 +4,11 @@ import uuid
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.services.recurrence import es_recurrencia_valida
+
+_AYUDA_REC = "diaria | semanal | mensual | trimestral | anual | cada_<N>_dias"
 
 
 class ReminderOrigen(str, Enum):
@@ -18,6 +22,14 @@ class ReminderCreate(BaseModel):
     disparar_en: datetime
     origen_tipo: ReminderOrigen | None = None
     origen_id: uuid.UUID | None = None
+    recurrencia: str | None = Field(default=None, description=_AYUDA_REC)
+
+    @field_validator("recurrencia")
+    @classmethod
+    def _v_rec(cls, v: str | None) -> str | None:
+        if v is not None and not es_recurrencia_valida(v):
+            raise ValueError(f"Recurrencia inválida. Use: {_AYUDA_REC}")
+        return v
 
     @model_validator(mode="after")
     def _origen_completo(self) -> "ReminderCreate":
@@ -49,3 +61,4 @@ class ReminderOut(BaseModel):
     veces_avisado: int
     pospuesto_para: datetime | None
     resuelto: bool
+    recurrencia: str | None = None

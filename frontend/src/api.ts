@@ -109,6 +109,7 @@ export interface Task {
   fecha_inicio_plan: string | null
   fecha_inicio_real: string | null
   fecha_fin_real: string | null
+  recurrencia: string | null
   checklist: ChecklistItem[]
 }
 export interface TaskFechas {
@@ -119,6 +120,7 @@ export interface TaskFechas {
   fecha_inicio_plan?: string | null
   fecha_inicio_real?: string | null
   fecha_fin_real?: string | null
+  recurrencia?: string | null
 }
 export interface ProjectDetail extends Project {
   tasks: Task[]
@@ -184,6 +186,7 @@ export interface Reminder {
   veces_avisado: number
   pospuesto_para: string | null
   resuelto: boolean
+  recurrencia: string | null
 }
 export interface Responsibility {
   id: string
@@ -534,10 +537,14 @@ export const api = {
     ),
   // Solo los que ya "llegaron" (disparo efectivo <= ahora), sin resolver.
   listDueReminders: () => request<Reminder[]>('/reminders/vencidos'),
-  createReminder: (texto: string, dispararEn: string) =>
+  createReminder: (
+    texto: string,
+    dispararEn: string,
+    recurrencia: string | null = null
+  ) =>
     request<Reminder>('/reminders', {
       method: 'POST',
-      body: JSON.stringify({ texto, disparar_en: dispararEn }),
+      body: JSON.stringify({ texto, disparar_en: dispararEn, recurrencia }),
     }),
   snoozeReminder: (id: string, pospuestoPara: string) =>
     request<Reminder>(`/reminders/${id}/snooze`, {

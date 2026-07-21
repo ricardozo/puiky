@@ -35,6 +35,7 @@ export default function Recordatorios() {
   const [verResueltos, setVerResueltos] = useState(false)
   const [texto, setTexto] = useState('')
   const [cuando, setCuando] = useState('')
+  const [recurrencia, setRecurrencia] = useState('')
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(true)
 
@@ -60,9 +61,10 @@ export default function Recordatorios() {
       return
     }
     try {
-      await api.createReminder(texto.trim(), aISOColombia(cuando))
+      await api.createReminder(texto.trim(), aISOColombia(cuando), recurrencia || null)
       setTexto('')
       setCuando('')
+      setRecurrencia('')
       cargar()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al crear')
@@ -108,6 +110,19 @@ export default function Recordatorios() {
           max="9999-12-31T23:59"
           className="input w-auto"
         />
+        <select
+          value={recurrencia}
+          onChange={(e) => setRecurrencia(e.target.value)}
+          className="input w-auto"
+          title="Repetir: al resolverlo, vuelve el siguiente periodo"
+        >
+          <option value="">No se repite</option>
+          <option value="diaria">Diario</option>
+          <option value="semanal">Semanal</option>
+          <option value="mensual">Mensual</option>
+          <option value="trimestral">Trimestral</option>
+          <option value="anual">Anual</option>
+        </select>
         <button className="btn">Crear</button>
       </form>
       {error && <p className="text-[color:var(--c-danger)] text-sm">{error}</p>}
@@ -128,6 +143,9 @@ export default function Recordatorios() {
                 <div>
                   <p className={r.resuelto ? 'line-through text-faint' : ''}>
                     {r.texto}
+                    {r.recurrencia && (
+                      <span className="badge ml-2 text-xs">🔁 {r.recurrencia}</span>
+                    )}
                   </p>
                   <p className="text-xs mt-1">
                     <span className={venc ? 'text-[color:var(--c-danger)]' : 'text-faint'}>

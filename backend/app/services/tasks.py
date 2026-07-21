@@ -9,6 +9,7 @@ checklist, `avance_pct` es manual.
 """
 
 import uuid
+from datetime import date
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
@@ -16,9 +17,33 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.projects import Project
 from app.models.tasks import ChecklistItem, Task
 from app.schemas.tasks import ChecklistItemCreate, ChecklistItemUpdate, TaskCreate, TaskUpdate
+from app.services.recurrence import siguiente_vencimiento
 
 TERMINADA = "terminada"
 EN_EJECUCION = "en_ejecucion"
+PLANEADA = "planeada"
+
+
+def _reciclar(task: Task) -> None:
+    """Tarea recurrente completada: reinicia y avanza la fecha límite al
+    siguiente periodo (desde la fecha límite, o desde hoy si no tenía)."""
+    base = task.fecha_limite or date.today()
+    task.fecha_limite = siguiente_vencimiento(base, task.recurrencia)
+    task.estado = PLANEADA
+    task.avance_pct = 0
+    task.fecha_inicio_real = None
+    task.fecha_fin_real = None
+    for item in task.checklist:
+        item.hecho = False
+
+
+def _completar(task: Task) -> None:
+    """Completa una tarea: si es recurrente, la recicla; si no, la termina."""
+    if task.recurrencia:
+        _reciclar(task)
+    else:
+        task.estado = TERMINADA
+        task.avance_pct = 100
 
 
 def _validar_proyecto(db: Session, project_id: uuid.UUID | None) -> None:
@@ -39,11 +64,12 @@ def _aplicar_progreso_checklist(task: Task) -> None:
         return
     total = len(items)
     hechos = sum(1 for i in items if i.hecho)
-    task.avance_pct = round(hechos / total * 100)
     if hechos == total:
-        task.estado = TERMINADA
-    elif task.estado == TERMINADA:
-        task.estado = EN_EJECUCION
+        _completar(task)  # recicla si es recurrente, o termina
+    else:
+        task.avance_pct = round(hechos / total * 100)
+        if task.estado == TERMINADA:
+            task.estado = EN_EJECUCION
 
 
 def create_task(db: Session, data: TaskCreate) -> Task:
@@ -59,6 +85,7 @@ def create_task(db: Session, data: TaskCreate) -> Task:
         fecha_inicio_plan=data.fecha_inicio_plan,
         fecha_inicio_real=data.fecha_inicio_real,
         fecha_fin_real=data.fecha_fin_real,
+        recurrencia=data.recurrencia,
     )
     db.add(task)
     db.commit()
@@ -128,7 +155,7 @@ def update_task(db: Session, task_id: uuid.UUID, data: TaskUpdate) -> Task | Non
         setattr(task, campo, valor)
     # Coherencia de avance con el estado / checklist:
     if cambios.get("estado") == TERMINADA:
-        task.avance_pct = 100
+        _completar(task)  # recicla si es recurrente, o fija avance 100
     elif "estado" in cambios:
         _aplicar_progreso_checklist(task)  # recalcula desde checklist si lo hay
     db.commit()
@@ -148,12 +175,12 @@ def set_progress(db: Session, task_id: uuid.UUID, avance_pct: int) -> Task | Non
 
 
 def complete_task(db: Session, task_id: uuid.UUID) -> Task | None:
-    """Marca completada: estado terminada y avance 100%."""
+    """Completa la tarea. Si es recurrente, la reinicia y avanza su fecha límite;
+    si no, la marca terminada al 100%."""
     task = get_task(db, task_id)
     if task is None:
         return None
-    task.estado = TERMINADA
-    task.avance_pct = 100
+    _completar(task)
     db.commit()
     db.refresh(task)
     return task

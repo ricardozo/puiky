@@ -4,7 +4,17 @@ import uuid
 from datetime import date
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.services.recurrence import es_recurrencia_valida
+
+_AYUDA_REC = "diaria | semanal | mensual | trimestral | anual | cada_<N>_dias"
+
+
+def _validar_recurrencia_opcional(v: str | None) -> str | None:
+    if v is not None and not es_recurrencia_valida(v):
+        raise ValueError(f"Recurrencia inválida. Use: {_AYUDA_REC}")
+    return v
 
 
 class TaskEstado(str, Enum):
@@ -27,6 +37,9 @@ class TaskCreate(BaseModel):
     fecha_inicio_plan: date | None = None
     fecha_inicio_real: date | None = None
     fecha_fin_real: date | None = None
+    recurrencia: str | None = Field(default=None, description=_AYUDA_REC)
+
+    _v_rec = field_validator("recurrencia")(_validar_recurrencia_opcional)
 
 
 class TaskUpdate(BaseModel):
@@ -44,6 +57,9 @@ class TaskUpdate(BaseModel):
     fecha_inicio_plan: date | None = None
     fecha_inicio_real: date | None = None
     fecha_fin_real: date | None = None
+    recurrencia: str | None = Field(default=None, description=_AYUDA_REC)
+
+    _v_rec = field_validator("recurrencia")(_validar_recurrencia_opcional)
 
 
 class TaskProgress(BaseModel):
@@ -86,4 +102,5 @@ class TaskOut(BaseModel):
     fecha_inicio_plan: date | None
     fecha_inicio_real: date | None
     fecha_fin_real: date | None
+    recurrencia: str | None = None
     checklist: list[ChecklistItemOut] = []
