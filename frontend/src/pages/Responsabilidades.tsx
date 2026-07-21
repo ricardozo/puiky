@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   api,
   ApiError,
@@ -9,6 +9,21 @@ import {
 } from '../api'
 
 const RECURRENCIAS = ['diaria', 'semanal', 'mensual', 'trimestral', 'anual']
+
+// Factor para convertir cada recurrencia a su costo mensual equivalente.
+const FACTOR_MENSUAL: Record<string, number> = {
+  diaria: 365 / 12,
+  semanal: 52 / 12,
+  mensual: 1,
+  trimestral: 1 / 3,
+  anual: 1 / 12,
+}
+function factorMensual(recurrencia: string): number {
+  if (recurrencia in FACTOR_MENSUAL) return FACTOR_MENSUAL[recurrencia]
+  const m = /^cada_(\d+)_dias$/.exec(recurrencia)
+  if (m) return 365 / Number(m[1]) / 12
+  return 1
+}
 
 export default function Responsabilidades() {
   const [items, setItems] = useState<Responsibility[]>([])
@@ -25,6 +40,21 @@ export default function Responsabilidades() {
   const [cargando, setCargando] = useState(true)
   const [editando, setEditando] = useState<Responsibility | null>(null)
   const [pagando, setPagando] = useState<Responsibility | null>(null)
+
+  // Resumen: total y desglose por categoría, en equivalente mensual.
+  const resumen = useMemo(() => {
+    let total = 0
+    const porCat = new Map<string, number>()
+    for (const r of items) {
+      if (!r.monto) continue
+      const mensual = Number(r.monto) * factorMensual(r.recurrencia)
+      total += mensual
+      const cat = r.categoria ?? '(sin categoría)'
+      porCat.set(cat, (porCat.get(cat) ?? 0) + mensual)
+    }
+    const categorias = [...porCat.entries()].sort((a, b) => b[1] - a[1])
+    return { total, categorias }
+  }, [items])
 
   const cargar = () =>
     api.listResponsibilities().then(setItems).finally(() => setCargando(false))
@@ -167,6 +197,30 @@ export default function Responsabilidades() {
       </form>
       {error && <p className="text-[color:var(--c-danger)] text-sm">{error}</p>}
       {aviso && <p className="text-[color:var(--c-green)] text-sm">{aviso}</p>}
+
+      {resumen.total > 0 && (
+        <section className="card p-4 space-y-3">
+          <div className="flex items-baseline justify-between gap-3">
+            <h3 className="eyebrow">Pagos fijos · equivalente mensual</h3>
+            <span className="font-serif text-2xl">${fmtMoney(Math.round(resumen.total))}</span>
+          </div>
+          <p className="text-xs text-faint">
+            Convierte cada compromiso a su costo mensual (anual ÷12, trimestral ÷3,
+            etc.). Solo cuenta los que tienen monto.
+          </p>
+          <div className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+            {resumen.categorias.map(([cat, m]) => (
+              <div
+                key={cat}
+                className="flex items-center justify-between text-sm border-t border-line pt-1.5"
+              >
+                <span className="text-muted truncate">{cat}</span>
+                <span className="tabular-nums shrink-0">${fmtMoney(Math.round(m))}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {cargando ? (
         <p className="text-faint">Cargando…</p>
