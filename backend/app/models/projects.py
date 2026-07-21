@@ -1,8 +1,9 @@
 """Modelo del dominio de proyectos."""
 
 import uuid
+from datetime import date
 
-from sqlalchemy import UUID, ForeignKey, Index, String, Text, text
+from sqlalchemy import UUID, Date, ForeignKey, Index, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -23,6 +24,8 @@ class Project(Base):
     estado: Mapped[str] = mapped_column(
         String(20), nullable=False, server_default=text("'activo'")
     )
+    fecha_inicio: Mapped[date | None] = mapped_column(Date, nullable=True)
+    fecha_fin: Mapped[date | None] = mapped_column(Date, nullable=True)
     # Portafolio al que pertenece (opcional: null = sin portafolio).
     portfolio_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),

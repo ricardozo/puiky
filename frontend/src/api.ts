@@ -69,6 +69,11 @@ export interface Project {
   descripcion: string | null
   estado: string
   portfolio_id: string | null
+  fecha_inicio: string | null
+  fecha_fin: string | null
+  total_tareas: number
+  tareas_terminadas: number
+  avance: number | null
 }
 export interface Portfolio {
   id: string
@@ -309,6 +314,21 @@ export const api = {
     request<Project>(`/projects/${id}`, {
       method: 'PUT',
       body: JSON.stringify({ portfolio_id: portfolioId }),
+    }),
+  updateProject: (
+    id: string,
+    data: {
+      nombre?: string
+      descripcion?: string | null
+      estado?: string
+      portfolio_id?: string | null
+      fecha_inicio?: string | null
+      fecha_fin?: string | null
+    }
+  ) =>
+    request<Project>(`/projects/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
     }),
 
   // Portafolios

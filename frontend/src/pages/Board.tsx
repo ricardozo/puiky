@@ -94,6 +94,87 @@ function Column({
   )
 }
 
+const hoyISO = () => {
+  const d = new Date()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${day}`
+}
+
+function ProjectHeader({
+  project,
+  onCambio,
+}: {
+  project: ProjectDetail
+  onCambio: () => void
+}) {
+  const [desc, setDesc] = useState(project.descripcion ?? '')
+  const guardar = (patch: Parameters<typeof api.updateProject>[1]) =>
+    api.updateProject(project.id, patch).then(onCambio)
+  const vencido =
+    !!project.fecha_fin &&
+    project.fecha_fin < hoyISO() &&
+    project.estado !== 'terminado'
+
+  return (
+    <div className="card p-4 space-y-3 max-w-2xl">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-baseline gap-2 text-sm">
+          <span className="text-muted">
+            {project.tareas_terminadas}/{project.total_tareas} tareas
+          </span>
+          <span className="font-medium">
+            {project.avance === null ? 'sin tareas' : `${project.avance}% avance`}
+          </span>
+        </div>
+        <select
+          value={project.estado}
+          onChange={(e) => guardar({ estado: e.target.value })}
+          className="input w-auto py-1 text-sm"
+        >
+          <option value="activo">activo</option>
+          <option value="pausado">pausado</option>
+          <option value="terminado">terminado</option>
+        </select>
+      </div>
+      {project.total_tareas > 0 && (
+        <div className="h-2 rounded-full bg-[color:var(--c-surface-2)] overflow-hidden">
+          <div
+            className="h-full rounded-full"
+            style={{ width: `${project.avance}%`, background: 'var(--c-teal)' }}
+          />
+        </div>
+      )}
+      <textarea
+        value={desc}
+        onChange={(e) => setDesc(e.target.value)}
+        onBlur={() => guardar({ descripcion: desc.trim() || null })}
+        placeholder="Descripción del proyecto…"
+        rows={2}
+        className="input w-full text-sm"
+      />
+      <div className="grid grid-cols-2 gap-3">
+        <Fecha
+          label="Inicio"
+          value={project.fecha_inicio}
+          onChange={(v) => guardar({ fecha_inicio: v })}
+        />
+        <Fecha
+          label="Fin"
+          value={project.fecha_fin}
+          onChange={(v) => guardar({ fecha_fin: v })}
+        />
+      </div>
+      {vencido && (
+        <p className="text-xs text-[color:var(--c-danger)]">
+          ⏰ Venció el{' '}
+          {new Date(project.fecha_fin + 'T00:00').toLocaleDateString('es-CO')}
+        </p>
+      )}
+    </div>
+  )
+}
+
 export default function Board() {
   const { id } = useParams()
   const [project, setProject] = useState<ProjectDetail | null>(null)
@@ -146,6 +227,8 @@ export default function Board() {
         <h2 className="font-serif text-2xl">{project.nombre}</h2>
       </div>
 
+      <ProjectHeader project={project} onCambio={cargar} />
+
       <form onSubmit={crearTarea} className="flex gap-2 max-w-xl">
         <input
           value={nuevo}
@@ -170,16 +253,14 @@ export default function Board() {
         </div>
       </DndContext>
 
-      {project.notes.length > 0 && (
-        <div className="pt-4 border-t border-line">
-          <h3 className="eyebrow mb-2">Notas del proyecto</h3>
-          <ul className="space-y-1 text-sm text-muted">
-            {project.notes.map((n) => (
-              <li key={n.id}>• {n.titulo || n.contenido}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <div className="pt-4 border-t border-line max-w-2xl">
+        <h3 className="eyebrow mb-2">Notas del proyecto</h3>
+        <NotasVinculadas
+          entidadTipo="project"
+          entidadId={project.id}
+          placeholder="Nueva nota para el proyecto…"
+        />
+      </div>
 
       {abierta && (
         <TaskEditor
@@ -391,7 +472,11 @@ export function TaskEditor({
           />
         </label>
 
-        <NotasVinculadas taskId={task.id} />
+        <NotasVinculadas
+          entidadTipo="task"
+          entidadId={task.id}
+          placeholder="Nueva nota para esta tarea…"
+        />
 
         <div className="pt-2 border-t border-line">
           <button
@@ -406,27 +491,35 @@ export function TaskEditor({
   )
 }
 
-function NotasVinculadas({ taskId }: { taskId: string }) {
+function NotasVinculadas({
+  entidadTipo,
+  entidadId,
+  placeholder = 'Nueva nota…',
+}: {
+  entidadTipo: string
+  entidadId: string
+  placeholder?: string
+}) {
   const [notas, setNotas] = useState<Note[]>([])
   const [titulo, setTitulo] = useState('')
   const [cuerpo, setCuerpo] = useState('')
 
-  const cargar = () => api.linkedNotes('task', taskId).then(setNotas)
+  const cargar = () => api.linkedNotes(entidadTipo, entidadId).then(setNotas)
   useEffect(() => {
     cargar()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taskId])
+  }, [entidadTipo, entidadId])
 
   const crear = async () => {
     if (!cuerpo.trim()) return
     const n = await api.createNote(cuerpo.trim(), null, titulo.trim() || null)
-    await api.linkNote(n.id, 'task', taskId)
+    await api.linkNote(n.id, entidadTipo, entidadId)
     setTitulo('')
     setCuerpo('')
     cargar()
   }
   const desvincular = async (id: string) => {
-    await api.unlinkNote(id, 'task', taskId)
+    await api.unlinkNote(id, entidadTipo, entidadId)
     cargar()
   }
 
@@ -450,7 +543,7 @@ function NotasVinculadas({ taskId }: { taskId: string }) {
           <textarea
             value={cuerpo}
             onChange={(e) => setCuerpo(e.target.value)}
-            placeholder="Nueva nota para esta tarea…"
+            placeholder={placeholder}
             rows={2}
             className="input flex-1 text-sm py-1.5"
           />

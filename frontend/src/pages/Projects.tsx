@@ -99,6 +99,13 @@ function Home({
   )
 }
 
+const hoyISO = () => {
+  const d = new Date()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${day}`
+}
+
 const colorEstado: Record<string, string> = {
   activo: 'pill-active',
   pausado: 'pill-warn',
@@ -182,7 +189,10 @@ function Detalle({
         <p className="text-faint">Sin proyectos aquí.</p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {projects.map((p) => (
+          {projects.map((p) => {
+            const vencido =
+              !!p.fecha_fin && p.fecha_fin < hoyISO() && p.estado !== 'terminado'
+            return (
             <div
               key={p.id}
               onClick={() => navigate(`/proyectos/${p.id}`)}
@@ -194,6 +204,31 @@ function Detalle({
                   {p.estado}
                 </span>
               </div>
+              {p.descripcion && (
+                <p className="text-xs text-muted mt-1 line-clamp-2">{p.descripcion}</p>
+              )}
+              <div className="mt-3">
+                <div className="flex items-center justify-between text-xs text-muted mb-1">
+                  <span>
+                    {p.tareas_terminadas}/{p.total_tareas} tarea
+                    {p.total_tareas === 1 ? '' : 's'}
+                  </span>
+                  <span>{p.avance === null ? 'sin tareas' : `${p.avance}%`}</span>
+                </div>
+                {p.total_tareas > 0 && (
+                  <div className="h-1.5 rounded-full bg-[color:var(--c-surface-2)] overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${p.avance}%`, background: 'var(--c-teal)' }}
+                    />
+                  </div>
+                )}
+              </div>
+              {vencido && (
+                <div className="text-xs text-[color:var(--c-danger)] mt-2">
+                  ⏰ Venció el {new Date(p.fecha_fin + 'T00:00').toLocaleDateString('es-CO')}
+                </div>
+              )}
               <select
                 value={p.portfolio_id ?? ''}
                 onClick={(e) => e.stopPropagation()}
@@ -212,7 +247,8 @@ function Detalle({
                 ))}
               </select>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

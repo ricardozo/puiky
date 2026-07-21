@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.portfolios import Portfolio
@@ -10,10 +10,39 @@ from app.models.projects import Project
 from app.models.tasks import Task
 from app.schemas.projects import ProjectCreate, ProjectUpdate
 
-TERMINADO = "terminado"
+TERMINADO = "terminado"  # estado de PROYECTO
+TAREA_TERMINADA = "terminada"  # estado de TAREA
 
 # Centinela para distinguir "sin portafolio" (None) de "sin filtro".
 _SIN_FILTRO = object()
+
+
+def _adjuntar_avance(project: Project, total: int, terminadas: int) -> Project:
+    """Adjunta los derivados de tareas para que el schema los serialice."""
+    project.total_tareas = total  # type: ignore[attr-defined]
+    project.tareas_terminadas = terminadas  # type: ignore[attr-defined]
+    project.avance = (  # type: ignore[attr-defined]
+        round(terminadas / total * 100) if total else None
+    )
+    return project
+
+
+def _conteos_por_proyecto(
+    db: Session, ids: list[uuid.UUID]
+) -> dict[uuid.UUID, tuple[int, int]]:
+    """{project_id: (total_tareas, terminadas)} en una sola consulta."""
+    if not ids:
+        return {}
+    filas = db.execute(
+        select(
+            Task.project_id,
+            func.count(Task.id),
+            func.count(Task.id).filter(Task.estado == TAREA_TERMINADA),
+        )
+        .where(Task.project_id.in_(ids))
+        .group_by(Task.project_id)
+    ).all()
+    return {pid: (total, term) for pid, total, term in filas}
 
 
 def _validar_portafolio(db: Session, portfolio_id: uuid.UUID | None) -> None:
@@ -28,11 +57,13 @@ def create_project(db: Session, data: ProjectCreate) -> Project:
         descripcion=data.descripcion,
         estado=data.estado.value,
         portfolio_id=data.portfolio_id,
+        fecha_inicio=data.fecha_inicio,
+        fecha_fin=data.fecha_fin,
     )
     db.add(project)
     db.commit()
     db.refresh(project)
-    return project
+    return _adjuntar_avance(project, 0, 0)
 
 
 def get_project(db: Session, project_id: uuid.UUID) -> Project | None:
@@ -45,7 +76,12 @@ def get_project(db: Session, project_id: uuid.UUID) -> Project | None:
         )
         .where(Project.id == project_id)
     )
-    return db.execute(stmt).scalar_one_or_none()
+    project = db.execute(stmt).scalar_one_or_none()
+    if project is not None:
+        total = len(project.tasks)
+        terminadas = sum(1 for t in project.tasks if t.estado == TAREA_TERMINADA)
+        _adjuntar_avance(project, total, terminadas)
+    return project
 
 
 def list_projects(
@@ -61,7 +97,12 @@ def list_projects(
     if portfolio_id is not _SIN_FILTRO:
         stmt = stmt.where(Project.portfolio_id == portfolio_id)
     stmt = stmt.order_by(Project.nombre)
-    return list(db.execute(stmt).scalars().all())
+    proyectos = list(db.execute(stmt).scalars().all())
+    conteos = _conteos_por_proyecto(db, [p.id for p in proyectos])
+    for p in proyectos:
+        total, term = conteos.get(p.id, (0, 0))
+        _adjuntar_avance(p, total, term)
+    return proyectos
 
 
 def update_project(
@@ -79,7 +120,8 @@ def update_project(
         setattr(project, campo, valor)
     db.commit()
     db.refresh(project)
-    return project
+    total, term = _conteos_por_proyecto(db, [project.id]).get(project.id, (0, 0))
+    return _adjuntar_avance(project, total, term)
 
 
 def archive_project(db: Session, project_id: uuid.UUID) -> Project | None:
@@ -90,4 +132,5 @@ def archive_project(db: Session, project_id: uuid.UUID) -> Project | None:
     project.estado = TERMINADO
     db.commit()
     db.refresh(project)
-    return project
+    total, term = _conteos_por_proyecto(db, [project.id]).get(project.id, (0, 0))
+    return _adjuntar_avance(project, total, term)

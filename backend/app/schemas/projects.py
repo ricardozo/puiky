@@ -1,6 +1,7 @@
 """Schemas Pydantic del dominio de proyectos."""
 
 import uuid
+from datetime import date
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -20,6 +21,8 @@ class ProjectCreate(BaseModel):
     descripcion: str | None = None
     estado: ProjectEstado = ProjectEstado.activo
     portfolio_id: uuid.UUID | None = None
+    fecha_inicio: date | None = None
+    fecha_fin: date | None = None
 
 
 class ProjectUpdate(BaseModel):
@@ -30,6 +33,8 @@ class ProjectUpdate(BaseModel):
     descripcion: str | None = None
     estado: ProjectEstado | None = None
     portfolio_id: uuid.UUID | None = None
+    fecha_inicio: date | None = None
+    fecha_fin: date | None = None
 
 
 class ProjectOut(BaseModel):
@@ -40,6 +45,12 @@ class ProjectOut(BaseModel):
     descripcion: str | None
     estado: str
     portfolio_id: uuid.UUID | None
+    fecha_inicio: date | None = None
+    fecha_fin: date | None = None
+    # Derivados (los adjunta el servicio a partir de las tareas).
+    total_tareas: int = 0
+    tareas_terminadas: int = 0
+    avance: int | None = None  # % (terminadas/total); None si no hay tareas
 
 
 class ProjectDetailOut(ProjectOut):
