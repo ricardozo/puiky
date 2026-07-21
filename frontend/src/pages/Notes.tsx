@@ -1,5 +1,28 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api, type Note, type Notebook, type SearchResult } from '../api'
+
+function EnlacesNota({ nota }: { nota: Note }) {
+  const navigate = useNavigate()
+  if (!nota.enlaces || nota.enlaces.length === 0) return null
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-2">
+      {nota.enlaces.map((e) => (
+        <span
+          key={`${e.tipo}-${e.id}`}
+          onClick={(ev) => {
+            ev.stopPropagation()
+            if (e.project_id) navigate(`/proyectos/${e.project_id}`)
+          }}
+          className="inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-xs hover:border-teal transition"
+          title={e.tipo === 'task' ? 'Ir al tablero del proyecto' : 'Ir al proyecto'}
+        >
+          {e.tipo === 'task' ? '✓' : '💼'} {e.etiqueta}
+        </span>
+      ))}
+    </div>
+  )
+}
 
 type Seleccion =
   | { tipo: 'home' }
@@ -168,7 +191,12 @@ function Home({
                 onClick={() => onAbrir({ tipo: 'cuaderno', nb })}
                 className="card text-left p-4 hover:border-teal transition"
               >
-                <div className="text-2xl">📓</div>
+                <div className="flex items-start justify-between">
+                  <div className="text-2xl">{nb.es_proyecto ? '💼' : '📓'}</div>
+                  {nb.es_proyecto && (
+                    <span className="pill pill-active text-xs">Proyecto</span>
+                  )}
+                </div>
                 <div className="font-medium mt-2">{nb.nombre}</div>
                 <div className="text-xs text-faint mt-1">
                   {nb.notas} nota{nb.notas === 1 ? '' : 's'}
@@ -278,6 +306,7 @@ function Detalle({
                   <span className="ml-2">· 📓 {nombreCuaderno(n.notebook_id)}</span>
                 )}
               </div>
+              <EnlacesNota nota={n} />
             </button>
           ))}
         </div>

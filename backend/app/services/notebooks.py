@@ -7,7 +7,13 @@ from sqlalchemy.orm import Session
 
 from app.models.notebooks import Notebook
 from app.models.notes import Note
+from app.models.projects import Project
 from app.schemas.notebooks import NotebookCreate, NotebookUpdate
+
+
+def nombres_proyectos_lower(db: Session) -> set[str]:
+    """Nombres de proyectos en minúscula (para marcar cuadernos de proyecto)."""
+    return {r[0].lower() for r in db.execute(select(Project.nombre))}
 
 
 def create_notebook(db: Session, data: NotebookCreate) -> Notebook:

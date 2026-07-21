@@ -42,6 +42,15 @@ class NoteAppend(BaseModel):
     texto: str = Field(min_length=1)
 
 
+class NoteEnlaceOut(BaseModel):
+    """Enlace legible de una nota a un proyecto o tarea (para mostrar y navegar)."""
+
+    tipo: str  # 'project' | 'task'
+    id: uuid.UUID
+    etiqueta: str
+    project_id: uuid.UUID | None = None  # tablero al que navegar (tareas)
+
+
 class NoteOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -51,6 +60,7 @@ class NoteOut(BaseModel):
     notebook_id: uuid.UUID | None
     creada: datetime
     actualizada: datetime
+    enlaces: list[NoteEnlaceOut] = []
 
 
 # --- Vínculos ---

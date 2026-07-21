@@ -81,6 +81,48 @@ def get_note(db: Session, note_id: uuid.UUID) -> Note | None:
 _SIN_FILTRO = object()
 
 
+def _adjuntar_enlaces(db: Session, notas: list[Note]) -> list[Note]:
+    """Adjunta a cada nota sus enlaces legibles a proyectos/tareas (sin N+1)."""
+    ids = [n.id for n in notas]
+    if not ids:
+        return notas
+    links = list(
+        db.execute(
+            select(NoteLink).where(
+                NoteLink.note_id.in_(ids),
+                NoteLink.entidad_tipo.in_(["project", "task"]),
+            )
+        ).scalars()
+    )
+    proj_ids = {ln.entidad_id for ln in links if ln.entidad_tipo == "project"}
+    task_ids = {ln.entidad_id for ln in links if ln.entidad_tipo == "task"}
+    proyectos = (
+        {p.id: p for p in db.execute(select(Project).where(Project.id.in_(proj_ids))).scalars()}
+        if proj_ids
+        else {}
+    )
+    tareas = (
+        {t.id: t for t in db.execute(select(Task).where(Task.id.in_(task_ids))).scalars()}
+        if task_ids
+        else {}
+    )
+    por_nota: dict[uuid.UUID, list[dict]] = {}
+    for ln in links:
+        if ln.entidad_tipo == "project" and ln.entidad_id in proyectos:
+            p = proyectos[ln.entidad_id]
+            por_nota.setdefault(ln.note_id, []).append(
+                {"tipo": "project", "id": p.id, "etiqueta": p.nombre, "project_id": p.id}
+            )
+        elif ln.entidad_tipo == "task" and ln.entidad_id in tareas:
+            t = tareas[ln.entidad_id]
+            por_nota.setdefault(ln.note_id, []).append(
+                {"tipo": "task", "id": t.id, "etiqueta": t.titulo, "project_id": t.project_id}
+            )
+    for n in notas:
+        n.enlaces = por_nota.get(n.id, [])  # type: ignore[attr-defined]
+    return notas
+
+
 def list_notes(
     db: Session,
     limit: int = 50,
@@ -93,7 +135,8 @@ def list_notes(
     if notebook_id is not _SIN_FILTRO:
         stmt = stmt.where(Note.notebook_id == notebook_id)
     stmt = stmt.order_by(Note.creada.desc()).limit(limit).offset(offset)
-    return list(db.execute(stmt).scalars().all())
+    notas = list(db.execute(stmt).scalars().all())
+    return _adjuntar_enlaces(db, notas)
 
 
 def update_note(db: Session, note_id: uuid.UUID, data: NoteUpdate) -> Note | None:
@@ -165,6 +208,11 @@ def add_link(
         raise ValueError(f"La entidad {tipo} indicada no existe")
     if tipo == "project" and entidad is not None:
         note.notebook_id = cuaderno_de_proyecto(db, entidad).id
+    elif tipo == "task" and entidad is not None and entidad.project_id is not None:
+        # Las notas de una tarea van al cuaderno del proyecto de esa tarea.
+        proyecto = db.get(Project, entidad.project_id)
+        if proyecto is not None:
+            note.notebook_id = cuaderno_de_proyecto(db, proyecto).id
     link = NoteLink(
         note_id=note_id,
         entidad_tipo=tipo,

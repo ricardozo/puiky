@@ -24,3 +24,4 @@ class NotebookOut(BaseModel):
     descripcion: str | None
     creada: datetime
     notas: int = 0  # cuántas notas contiene
+    es_proyecto: bool = False  # cuaderno homónimo de un proyecto

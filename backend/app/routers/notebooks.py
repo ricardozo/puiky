@@ -12,13 +12,14 @@ from app.services import notebooks as service
 router = APIRouter(prefix="/notebooks", tags=["cuadernos"])
 
 
-def _out(nb, notas: int) -> NotebookOut:
+def _out(nb, notas: int, es_proyecto: bool = False) -> NotebookOut:
     return NotebookOut(
         id=nb.id,
         nombre=nb.nombre,
         descripcion=nb.descripcion,
         creada=nb.creada,
         notas=notas,
+        es_proyecto=es_proyecto,
     )
 
 
@@ -32,7 +33,11 @@ def crear_cuaderno(
 @router.get("", response_model=list[NotebookOut])
 def listar_cuadernos(db: Session = Depends(get_db)) -> list[NotebookOut]:
     """Cuadernos con su conteo de notas."""
-    return [_out(nb, n) for nb, n in service.list_notebooks(db)]
+    proyectos = service.nombres_proyectos_lower(db)
+    return [
+        _out(nb, n, es_proyecto=nb.nombre.lower() in proyectos)
+        for nb, n in service.list_notebooks(db)
+    ]
 
 
 @router.get("/{notebook_id}", response_model=NotebookOut)
@@ -42,7 +47,8 @@ def ver_cuaderno(
     nb = service.get_notebook(db, notebook_id)
     if nb is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Cuaderno no encontrado")
-    return _out(nb, service.count_notes(db, notebook_id))
+    es_proyecto = nb.nombre.lower() in service.nombres_proyectos_lower(db)
+    return _out(nb, service.count_notes(db, notebook_id), es_proyecto)
 
 
 @router.put("/{notebook_id}", response_model=NotebookOut)
@@ -52,7 +58,8 @@ def editar_cuaderno(
     nb = service.update_notebook(db, notebook_id, data)
     if nb is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Cuaderno no encontrado")
-    return _out(nb, service.count_notes(db, notebook_id))
+    es_proyecto = nb.nombre.lower() in service.nombres_proyectos_lower(db)
+    return _out(nb, service.count_notes(db, notebook_id), es_proyecto)
 
 
 @router.delete("/{notebook_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -44,6 +44,12 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   return data as T
 }
 
+export interface NoteEnlace {
+  tipo: string // 'project' | 'task'
+  id: string
+  etiqueta: string
+  project_id: string | null
+}
 export interface Note {
   id: string
   titulo: string | null
@@ -51,6 +57,7 @@ export interface Note {
   notebook_id: string | null
   creada: string
   actualizada: string
+  enlaces?: NoteEnlace[]
 }
 export interface SearchResult extends Note {
   similitud: number
@@ -61,6 +68,7 @@ export interface Notebook {
   descripcion: string | null
   creada: string
   notas: number
+  es_proyecto?: boolean
 }
 
 export interface Project {
