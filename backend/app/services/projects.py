@@ -5,6 +5,7 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.models.notebooks import Notebook
 from app.models.portfolios import Portfolio
 from app.models.projects import Project
 from app.models.tasks import Task
@@ -48,6 +49,23 @@ def _conteos_por_proyecto(
 def _validar_portafolio(db: Session, portfolio_id: uuid.UUID | None) -> None:
     if portfolio_id is not None and db.get(Portfolio, portfolio_id) is None:
         raise ValueError("El portafolio indicado no existe")
+
+
+def _renombrar_cuaderno(db: Session, nombre_viejo: str, nombre_nuevo: str) -> None:
+    """Mantiene el cuaderno homónimo del proyecto en sincronía con su nombre."""
+    nb = db.execute(
+        select(Notebook).where(func.lower(Notebook.nombre) == nombre_viejo.lower())
+    ).scalar_one_or_none()
+    if nb is None:
+        return
+    ya_existe = db.execute(
+        select(Notebook.id).where(
+            func.lower(Notebook.nombre) == nombre_nuevo.lower(),
+            Notebook.id != nb.id,
+        )
+    ).first()
+    if ya_existe is None:  # evita chocar con otro cuaderno ya llamado así
+        nb.nombre = nombre_nuevo
 
 
 def create_project(db: Session, data: ProjectCreate) -> Project:
@@ -116,8 +134,12 @@ def update_project(
         cambios["estado"] = cambios["estado"].value
     if "portfolio_id" in cambios:
         _validar_portafolio(db, cambios["portfolio_id"])
+    nombre_viejo = project.nombre
     for campo, valor in cambios.items():
         setattr(project, campo, valor)
+    nombre_nuevo = cambios.get("nombre")
+    if nombre_nuevo and nombre_nuevo != nombre_viejo:
+        _renombrar_cuaderno(db, nombre_viejo, nombre_nuevo)
     db.commit()
     db.refresh(project)
     total, term = _conteos_por_proyecto(db, [project.id]).get(project.id, (0, 0))

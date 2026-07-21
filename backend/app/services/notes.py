@@ -6,7 +6,7 @@ sesión de BD y opera. Así la misma operación sirve a cualquier llamante.
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.embeddings import get_embedder
@@ -132,6 +132,19 @@ def delete_note(db: Session, note_id: uuid.UUID) -> bool:
     return True
 
 
+def cuaderno_de_proyecto(db: Session, project: Project) -> Notebook:
+    """Cuaderno homónimo del proyecto (lo crea si no existe). Las notas de un
+    proyecto se agrupan ahí."""
+    nb = db.execute(
+        select(Notebook).where(func.lower(Notebook.nombre) == project.nombre.lower())
+    ).scalar_one_or_none()
+    if nb is None:
+        nb = Notebook(nombre=project.nombre)
+        db.add(nb)
+        db.flush()
+    return nb
+
+
 def add_link(
     db: Session, note_id: uuid.UUID, data: NoteLinkCreate
 ) -> NoteLink | None:
@@ -139,15 +152,19 @@ def add_link(
 
     Valida que el destino exista para los cuatro tipos (project / task /
     responsibility / account). Señala destino inexistente con ValueError,
-    que el router traduce a 400.
+    que el router traduce a 400. Si el destino es un proyecto, la nota queda en
+    el cuaderno homónimo del proyecto.
     """
     note = db.get(Note, note_id)
     if note is None:
         return None
     tipo = data.entidad_tipo.value
     modelo = _MODELOS_VALIDABLES.get(tipo)
-    if modelo is not None and db.get(modelo, data.entidad_id) is None:
+    entidad = db.get(modelo, data.entidad_id) if modelo is not None else None
+    if modelo is not None and entidad is None:
         raise ValueError(f"La entidad {tipo} indicada no existe")
+    if tipo == "project" and entidad is not None:
+        note.notebook_id = cuaderno_de_proyecto(db, entidad).id
     link = NoteLink(
         note_id=note_id,
         entidad_tipo=tipo,
