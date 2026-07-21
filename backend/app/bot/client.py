@@ -77,3 +77,16 @@ class PuikyClient:
                 f"{self._base}{base}/{entidad_id}", headers=self._hdr(tenant_user)
             )
             r.raise_for_status()
+
+    async def create_transaction(
+        self, payload: dict, tenant_user: str | None = None
+    ) -> dict:
+        """Crea un movimiento (lo usa la confirmación de gastos grandes)."""
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as c:
+            r = await c.post(
+                f"{self._base}/transactions",
+                json=payload,
+                headers=self._hdr(tenant_user),
+            )
+            r.raise_for_status()
+            return r.json()

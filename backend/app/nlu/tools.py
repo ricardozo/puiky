@@ -519,9 +519,27 @@ def _agregar_nota_a_tarea(db: Session, a: dict) -> dict:
     return {"ok": True, "tarea": tarea.titulo, "nota": _etiqueta_hoja(nota)}
 
 
+# Gastos de este monto o más piden confirmación (red de seguridad ante un monto
+# mal interpretado por el modelo, p. ej. «130 mil» leído como 130 millones).
+_UMBRAL_CONFIRMA_GASTO = 5_000_000
+
+
 def _registrar_movimiento(db: Session, a: dict, tipo: TransactionTipo) -> dict:
     cuenta = _resolver_cuenta(db, a["cuenta"])
     categoria = _resolver_categoria(db, a["categoria"])
+    if tipo == TransactionTipo.gasto and float(a["monto"]) >= _UMBRAL_CONFIRMA_GASTO:
+        # No lo registra aún: el bot pedirá confirmación con botón.
+        monto_fmt = f"${int(float(a['monto'])):,}".replace(",", ".")
+        return {
+            "ok": True,
+            "confirmar_gasto": {
+                "monto": a["monto"],
+                "account_id": str(cuenta.id),
+                "category_id": str(categoria.id),
+                "nota": a.get("nota"),
+                "que": f"{monto_fmt} en {categoria.nombre} desde {cuenta.nombre}",
+            },
+        }
     tx = fin.create_transaction(
         db,
         TransactionCreate(

@@ -92,21 +92,29 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(BIENVENIDA, parse_mode="Markdown")
 
 
-def _confirmaciones(res: dict) -> list[dict]:
-    """Extrae las peticiones de confirmación de borrado del resultado."""
+def _extraer(res: dict, clave: str) -> list[dict]:
+    """Extrae del resultado las peticiones marcadas con `clave` (confirmar / confirmar_gasto)."""
     return [
-        a["resultado"]["confirmar"]
+        a["resultado"][clave]
         for a in res.get("acciones", [])
-        if isinstance(a.get("resultado"), dict) and a["resultado"].get("confirmar")
+        if isinstance(a.get("resultado"), dict) and a["resultado"].get(clave)
     ]
 
 
-async def _responder_interpretacion(update: Update, res: dict) -> None:
-    """Si hay borrados por confirmar, muestra SOLO la pregunta con botones (el
-    texto del modelo puede afirmar erróneamente que ya borró). Si no, responde."""
-    confirmaciones = _confirmaciones(res)
-    if confirmaciones:
-        for c in confirmaciones:
+def _confirmaciones(res: dict) -> list[dict]:
+    """Peticiones de confirmación de borrado (compat)."""
+    return _extraer(res, "confirmar")
+
+
+async def _responder_interpretacion(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, res: dict
+) -> None:
+    """Muestra SOLO la pregunta con botones cuando hay algo por confirmar (borrados,
+    o gastos de monto alto); el texto del modelo puede afirmar erróneamente que ya
+    lo hizo. Si no, responde normal."""
+    borrados = _extraer(res, "confirmar")
+    if borrados:
+        for c in borrados:
             teclado = InlineKeyboardMarkup(
                 [
                     [
@@ -121,6 +129,24 @@ async def _responder_interpretacion(update: Update, res: dict) -> None:
                 f"¿Seguro que quieres borrar {c['que']}?", reply_markup=teclado
             )
         return
+
+    gastos = _extraer(res, "confirmar_gasto")
+    if gastos:
+        context.chat_data["pending_gasto"] = gastos
+        que = "; ".join(g["que"] for g in gastos)
+        teclado = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("✅ Sí, registrar", callback_data="gasto_ok"),
+                    InlineKeyboardButton("Cancelar", callback_data="cancel"),
+                ]
+            ]
+        )
+        await update.message.reply_text(
+            f"⚠️ Es un monto alto. ¿Registro {que}?", reply_markup=teclado
+        )
+        return
+
     await update.message.reply_text(res.get("respuesta") or "Hecho.")
 
 
@@ -142,7 +168,7 @@ async def _procesar(update: Update, context, entrada: str, user_id: str) -> None
     """Interpreta `entrada` en el contexto del usuario y responde."""
     res = await _client.interpret(entrada, _historial(context), tenant_user=user_id)
     _recordar(context, entrada, res.get("respuesta") or "")
-    await _responder_interpretacion(update, res)
+    await _responder_interpretacion(update, context, res)
 
 
 async def texto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -166,7 +192,30 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
     data = q.data or ""
     if data == "cancel":
+        context.chat_data.pop("pending_gasto", None)
         await q.edit_message_text("Cancelado.")
+        return
+    if data == "gasto_ok":
+        pendientes = context.chat_data.pop("pending_gasto", [])
+        if not pendientes:
+            await q.edit_message_text("Ya no tengo ese gasto pendiente.")
+            return
+        try:
+            for g in pendientes:
+                await _client.create_transaction(
+                    {
+                        "tipo": "gasto",
+                        "monto": g["monto"],
+                        "account_id": g["account_id"],
+                        "category_id": g["category_id"],
+                        "nota": g.get("nota"),
+                    },
+                    tenant_user=user_id,
+                )
+            await q.edit_message_text("✅ Registrado.")
+        except Exception:
+            logger.exception("Error registrando gasto confirmado")
+            await q.edit_message_text("No pude registrarlo.")
         return
     if data.startswith("del:"):
         _, tipo, entidad_id = data.split(":", 2)
