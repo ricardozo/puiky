@@ -108,6 +108,7 @@ function ProjectHeader({
   project: ProjectDetail
   onCambio: () => void
 }) {
+  const [nombre, setNombre] = useState(project.nombre)
   const [desc, setDesc] = useState(project.descripcion ?? '')
   const guardar = (patch: Parameters<typeof api.updateProject>[1]) =>
     api.updateProject(project.id, patch).then(onCambio)
@@ -118,6 +119,16 @@ function ProjectHeader({
 
   return (
     <div className="card p-4 space-y-3 max-w-2xl">
+      <input
+        value={nombre}
+        onChange={(e) => setNombre(e.target.value)}
+        onBlur={() => {
+          const v = nombre.trim()
+          if (v && v !== project.nombre) guardar({ nombre: v })
+        }}
+        placeholder="Nombre del proyecto"
+        className="input w-full font-serif text-lg"
+      />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-2 text-sm">
           <span className="text-muted">

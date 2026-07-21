@@ -29,6 +29,7 @@ export default function Projects() {
     <Detalle
       sel={sel}
       portfolios={portfolios}
+      onCambio={cargarPortfolios}
       onVolver={() => {
         cargarPortfolios()
         setSel({ tipo: 'home' })
@@ -115,24 +116,38 @@ const colorEstado: Record<string, string> = {
 function Detalle({
   sel,
   portfolios,
+  onCambio,
   onVolver,
 }: {
   sel: Seleccion
   portfolios: Portfolio[]
+  onCambio: () => void
   onVolver: () => void
 }) {
   const navigate = useNavigate()
   const [projects, setProjects] = useState<Project[]>([])
   const [nuevo, setNuevo] = useState('')
   const [cargando, setCargando] = useState(true)
+  const [editandoPf, setEditandoPf] = useState(false)
+  const [nombrePf, setNombrePf] = useState(
+    sel.tipo === 'portafolio' ? sel.pf.nombre : ''
+  )
 
   const pfId = sel.tipo === 'portafolio' ? sel.pf.id : null
   const titulo =
     sel.tipo === 'portafolio'
-      ? sel.pf.nombre
+      ? nombrePf
       : sel.tipo === 'sin'
         ? 'Sin portafolio'
         : 'Todos los proyectos'
+
+  const renombrarPf = async (e: FormEvent) => {
+    e.preventDefault()
+    if (sel.tipo !== 'portafolio' || !nombrePf.trim()) return
+    await api.updatePortfolio(sel.pf.id, { nombre: nombrePf.trim() })
+    setEditandoPf(false)
+    onCambio()
+  }
 
   const cargar = useCallback(() => {
     const opts =
@@ -166,7 +181,40 @@ function Detalle({
         <button onClick={onVolver} className="text-muted hover:text-ink text-sm">
           ← Portafolios
         </button>
-        <h2 className="font-serif text-2xl">💼 {titulo}</h2>
+        {sel.tipo === 'portafolio' && editandoPf ? (
+          <form onSubmit={renombrarPf} className="flex items-center gap-2">
+            <input
+              value={nombrePf}
+              onChange={(e) => setNombrePf(e.target.value)}
+              autoFocus
+              className="input w-auto text-lg"
+            />
+            <button className="btn text-sm py-1">Guardar</button>
+            <button
+              type="button"
+              onClick={() => {
+                setNombrePf(sel.pf.nombre)
+                setEditandoPf(false)
+              }}
+              className="btn-ghost btn text-sm py-1"
+            >
+              Cancelar
+            </button>
+          </form>
+        ) : (
+          <div className="flex items-center gap-2">
+            <h2 className="font-serif text-2xl">💼 {titulo}</h2>
+            {sel.tipo === 'portafolio' && (
+              <button
+                onClick={() => setEditandoPf(true)}
+                className="text-faint hover:text-brand text-sm"
+                title="Renombrar portafolio"
+              >
+                ✎
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <form onSubmit={crear} className="flex gap-2 max-w-xl">

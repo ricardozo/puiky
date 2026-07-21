@@ -346,6 +346,14 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ nombre, descripcion: descripcion || null }),
     }),
+  updatePortfolio: (
+    id: string,
+    data: { nombre?: string; descripcion?: string | null }
+  ) =>
+    request<Portfolio>(`/portfolios/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
   deletePortfolio: (id: string) =>
     request<void>(`/portfolios/${id}`, { method: 'DELETE' }),
 
