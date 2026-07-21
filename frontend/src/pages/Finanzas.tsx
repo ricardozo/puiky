@@ -205,6 +205,12 @@ const inicioMes = () => {
 }
 const hoyStr = () => ymd(new Date())
 
+const MESES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+]
+const etiquetaMes = (d: Date) => `${MESES[d.getMonth()]} ${d.getFullYear()}`
+
 const verde = 'text-[color:var(--c-green)]'
 const rojo = 'text-[color:var(--c-danger)]'
 
@@ -419,7 +425,7 @@ function Cuentas({
   )
 }
 
-// --- Panel: resultado por categoría (mes actual) ---
+// --- Panel: resultado por categoría (navegable por mes) ---
 
 function PorCategoria({
   categories,
@@ -430,11 +436,19 @@ function PorCategoria({
   transactions: Transaction[]
   onAbrir: (c: Category) => void
 }) {
-  const desde = inicioMes()
+  const [ref, setRef] = useState(() => {
+    const d = new Date()
+    return new Date(d.getFullYear(), d.getMonth(), 1)
+  })
+  const desde = ymd(ref)
+  const hasta = ymd(new Date(ref.getFullYear(), ref.getMonth() + 1, 0)) // último día
+  const cambiarMes = (delta: number) =>
+    setRef(new Date(ref.getFullYear(), ref.getMonth() + delta, 1))
+
   const filas = useMemo(() => {
     const acumulado = new Map<string, number>()
     for (const t of transactions) {
-      if (!t.category_id || t.fecha < desde) continue
+      if (!t.category_id || t.fecha < desde || t.fecha > hasta) continue
       if (t.tipo !== 'gasto' && t.tipo !== 'ingreso') continue
       const signo = t.tipo === 'ingreso' ? 1 : -1
       acumulado.set(
@@ -446,16 +460,39 @@ function PorCategoria({
       .filter((c) => acumulado.has(c.id))
       .map((c) => ({ cat: c, neto: acumulado.get(c.id) as number }))
       .sort((a, b) => Math.abs(b.neto) - Math.abs(a.neto))
-  }, [categories, transactions, desde])
+  }, [categories, transactions, desde, hasta])
 
   return (
     <section className="space-y-3">
-      <div className="flex items-baseline justify-between">
-        <h3 className="eyebrow">Por categoría · este mes</h3>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h3 className="eyebrow">Por categoría</h3>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => cambiarMes(-1)}
+              className="rounded-lg border border-line px-2 py-0.5 text-muted hover:text-ink hover:bg-surface transition"
+              title="Mes anterior"
+            >
+              ◀
+            </button>
+            <span className="text-sm font-medium min-w-32 text-center">
+              {etiquetaMes(ref)}
+            </span>
+            <button
+              onClick={() => cambiarMes(1)}
+              className="rounded-lg border border-line px-2 py-0.5 text-muted hover:text-ink hover:bg-surface transition"
+              title="Mes siguiente"
+            >
+              ▶
+            </button>
+          </div>
+        </div>
         <span className="text-xs text-faint">clic para ver el detalle</span>
       </div>
       {filas.length === 0 ? (
-        <p className="text-faint text-sm">Sin movimientos con categoría este mes.</p>
+        <p className="text-faint text-sm">
+          Sin movimientos con categoría en {etiquetaMes(ref).toLowerCase()}.
+        </p>
       ) : (
         <div className="grid gap-2 sm:grid-cols-2">
           {filas.map(({ cat, neto }) => (
@@ -615,11 +652,17 @@ function Movimientos({
   onCambio: () => void
 }) {
   const [editando, setEditando] = useState<Transaction | null>(null)
+  const [pageSize, setPageSize] = useState(20)
+  const [page, setPage] = useState(0)
   const eliminar = async (id: string) => {
     if (!window.confirm('¿Eliminar este movimiento? Se revertirá el saldo.')) return
     await api.deleteTransaction(id)
     onCambio()
   }
+  const totalPages = Math.max(1, Math.ceil(transactions.length / pageSize))
+  const pageSafe = Math.min(page, totalPages - 1)
+  const inicio = pageSafe * pageSize
+  const visibles = transactions.slice(inicio, inicio + pageSize)
   return (
     <section className="space-y-3">
       {editando && (
@@ -634,12 +677,52 @@ function Movimientos({
           }}
         />
       )}
-      <h3 className="eyebrow">Movimientos recientes</h3>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="eyebrow">Movimientos</h3>
+        <div className="flex items-center gap-2 text-sm">
+          <label className="text-xs text-muted flex items-center gap-1">
+            Ver
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value))
+                setPage(0)
+              }}
+              className="input w-auto py-1"
+            >
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </label>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <button
+                disabled={pageSafe === 0}
+                onClick={() => setPage(pageSafe - 1)}
+                className="rounded-lg border border-line px-2 py-0.5 text-muted hover:text-ink hover:bg-surface transition disabled:opacity-40"
+              >
+                ‹
+              </button>
+              <span className="text-muted tabular-nums">
+                {pageSafe + 1} / {totalPages}
+              </span>
+              <button
+                disabled={pageSafe >= totalPages - 1}
+                onClick={() => setPage(pageSafe + 1)}
+                className="rounded-lg border border-line px-2 py-0.5 text-muted hover:text-ink hover:bg-surface transition disabled:opacity-40"
+              >
+                ›
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
       {transactions.length === 0 ? (
         <p className="text-faint text-sm">Sin movimientos.</p>
       ) : (
         <ul className="card divide-y divide-[color:var(--c-line)] p-0 overflow-hidden">
-          {transactions.slice(0, 20).map((t) => {
+          {visibles.map((t) => {
             const st = signoTipo[t.tipo]
             return (
               <li
@@ -678,6 +761,12 @@ function Movimientos({
             )
           })}
         </ul>
+      )}
+      {transactions.length > 0 && (
+        <p className="text-xs text-faint">
+          Mostrando {inicio + 1}–{Math.min(inicio + pageSize, transactions.length)} de{' '}
+          {transactions.length}
+        </p>
       )}
     </section>
   )
