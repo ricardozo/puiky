@@ -211,6 +211,26 @@ def delete_task(db: Session, task_id: uuid.UUID) -> bool:
 # --- Checklist ---
 
 
+def reorder_checklist(
+    db: Session, task_id: uuid.UUID, item_ids: list[uuid.UUID]
+) -> Task | None:
+    """Reordena el checklist según la lista de ids (posición = índice).
+    Exige exactamente los mismos ítems de la tarea (ni más ni menos)."""
+    task = get_task(db, task_id)
+    if task is None:
+        return None
+    if set(item_ids) != {i.id for i in task.checklist} or len(item_ids) != len(
+        task.checklist
+    ):
+        raise ValueError("La lista no coincide con los ítems del checklist")
+    posicion = {iid: n for n, iid in enumerate(item_ids)}
+    for item in task.checklist:
+        item.orden = posicion[item.id]
+    db.commit()
+    db.refresh(task)
+    return task
+
+
 def add_checklist_item(
     db: Session, task_id: uuid.UUID, data: ChecklistItemCreate
 ) -> Task | None:

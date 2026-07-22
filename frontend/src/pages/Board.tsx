@@ -3,13 +3,67 @@ import { Link, useParams } from 'react-router-dom'
 import {
   DndContext,
   PointerSensor,
+  closestCenter,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core'
-import { api, type Note, type ProjectDetail, type Task } from '../api'
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { api, type ChecklistItem, type Note, type ProjectDetail, type Task } from '../api'
+
+// Ítem de checklist arrastrable (agarra desde el mango ⠿, no desde el texto,
+// para no chocar con el checkbox ni el botón de borrar).
+function ItemChecklist({
+  item,
+  onToggle,
+  onDelete,
+}: {
+  item: ChecklistItem
+  onToggle: () => void
+  onDelete: () => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: item.id })
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`group flex items-center gap-2 ${isDragging ? 'opacity-60' : ''}`}
+    >
+      <span
+        {...attributes}
+        {...listeners}
+        title="Arrastra para reordenar"
+        className="cursor-grab active:cursor-grabbing text-faint select-none px-0.5"
+      >
+        ⠿
+      </span>
+      <input
+        type="checkbox"
+        checked={item.hecho}
+        onChange={onToggle}
+        className="size-4 accent-[color:var(--c-teal)]"
+      />
+      <span className={item.hecho ? 'line-through text-faint' : ''}>
+        {item.texto}
+      </span>
+      <button
+        onClick={onDelete}
+        className="ml-auto opacity-0 group-hover:opacity-100 text-faint hover:text-[color:var(--c-danger)] text-sm"
+      >
+        ✕
+      </button>
+    </div>
+  )
+}
 
 const COLUMNAS = [
   { estado: 'planeada', titulo: 'Planeada' },
@@ -347,6 +401,23 @@ export function TaskEditor({
     setTask(await api.toggleChecklistItem(itemId, hecho))
   const delItem = async (itemId: string) =>
     setTask(await api.deleteChecklistItem(itemId))
+  const sensorsChecklist = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  )
+  const reordenarChecklist = async (e: DragEndEvent) => {
+    const { active, over } = e
+    if (!over || active.id === over.id) return
+    const ids = task.checklist.map((i) => i.id)
+    const nuevo = arrayMove(
+      ids, ids.indexOf(String(active.id)), ids.indexOf(String(over.id))
+    )
+    // Optimista: reordena en pantalla ya; el backend confirma después.
+    setTask({
+      ...task,
+      checklist: nuevo.map((id) => task.checklist.find((i) => i.id === id)!),
+    })
+    setTask(await api.reorderChecklist(task.id, nuevo))
+  }
   const delTask = async () => {
     if (!window.confirm('¿Eliminar esta tarea?')) return
     await api.deleteTask(task.id)
@@ -470,25 +541,25 @@ export function TaskEditor({
               </span>
             )}
           </div>
-          {task.checklist.map((i) => (
-            <div key={i.id} className="group flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={i.hecho}
-                onChange={() => toggle(i.id, !i.hecho)}
-                className="size-4 accent-[color:var(--c-teal)]"
-              />
-              <span className={i.hecho ? 'line-through text-faint' : ''}>
-                {i.texto}
-              </span>
-              <button
-                onClick={() => delItem(i.id)}
-                className="ml-auto opacity-0 group-hover:opacity-100 text-faint hover:text-[color:var(--c-danger)] text-sm"
-              >
-                ✕
-              </button>
-            </div>
-          ))}
+          <DndContext
+            sensors={sensorsChecklist}
+            collisionDetection={closestCenter}
+            onDragEnd={reordenarChecklist}
+          >
+            <SortableContext
+              items={task.checklist.map((i) => i.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {task.checklist.map((i) => (
+                <ItemChecklist
+                  key={i.id}
+                  item={i}
+                  onToggle={() => toggle(i.id, !i.hecho)}
+                  onDelete={() => delItem(i.id)}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
           <div className="flex gap-2">
             <input
               value={nuevoItem}

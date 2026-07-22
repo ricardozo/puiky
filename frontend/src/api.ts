@@ -408,6 +408,11 @@ export const api = {
     }),
   deleteChecklistItem: (itemId: string) =>
     request<Task>(`/tasks/checklist/${itemId}`, { method: 'DELETE' }),
+  reorderChecklist: (taskId: string, itemIds: string[]) =>
+    request<Task>(`/tasks/${taskId}/checklist/orden`, {
+      method: 'PUT',
+      body: JSON.stringify({ items: itemIds }),
+    }),
 
   // Hojas vinculadas a una entidad (p. ej. una tarea)
   linkedNotes: (entidadTipo: string, entidadId: string) =>

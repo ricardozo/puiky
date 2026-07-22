@@ -9,6 +9,7 @@ from app.tenancy import get_tenant_db as get_db
 from app.schemas.tasks import (
     ChecklistItemCreate,
     ChecklistItemUpdate,
+    ChecklistReorden,
     TaskCreate,
     TaskEstado,
     TaskOut,
@@ -132,6 +133,20 @@ def agregar_item_checklist(
 ) -> TaskOut:
     """Añade un ítem al checklist de la tarea."""
     tarea = service.add_checklist_item(db, task_id, data)
+    if tarea is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Tarea no encontrada")
+    return tarea
+
+
+@router.put("/{task_id}/checklist/orden", response_model=TaskOut)
+def reordenar_checklist(
+    task_id: uuid.UUID, data: ChecklistReorden, db: Session = Depends(get_db)
+) -> TaskOut:
+    """Reordena el checklist (arrastrar y soltar en la web)."""
+    try:
+        tarea = service.reorder_checklist(db, task_id, data.items)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     if tarea is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Tarea no encontrada")
     return tarea

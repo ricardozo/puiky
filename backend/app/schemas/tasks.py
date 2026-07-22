@@ -73,6 +73,12 @@ class ChecklistItemCreate(BaseModel):
     texto: str = Field(min_length=1, max_length=300)
 
 
+class ChecklistReorden(BaseModel):
+    """Nuevo orden del checklist: TODOS los ids de los ítems, en su posición."""
+
+    items: list[uuid.UUID] = Field(min_length=1)
+
+
 class ChecklistItemUpdate(BaseModel):
     texto: str | None = Field(default=None, min_length=1, max_length=300)
     hecho: bool | None = None
