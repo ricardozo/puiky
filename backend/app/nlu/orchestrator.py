@@ -108,7 +108,6 @@ class InterpretResult:
 
 
 def _system_prompt(db: Session) -> str:
-    ahora = now_local().isoformat(timespec="minutes")
     categorias = [
         c.nombre
         for c in db.execute(
@@ -154,8 +153,9 @@ def _system_prompt(db: Session) -> str:
         "puede crecer; vive en un CUADERNO (que agrupa hojas). Para agregar algo a "
         "una hoja que ya existe usa 'anadir_a_hoja' (identifícala por su título); "
         "para una idea nueva usa 'crear_hoja'.\n"
-        f"- Fecha y hora actual: {ahora} (hora de Colombia). Convierte 'mañana', "
-        "'el viernes', etc. a fechas/horas ISO 8601 con offset -05:00.\n"
+        "- La fecha y hora actual llega al final del mensaje del usuario, como "
+        "[ahora: …]. Convierte 'mañana', 'el viernes', etc. a fechas/horas "
+        "ISO 8601 con offset -05:00 a partir de esa fecha.\n"
         "- Al listar tareas, si una trae el campo 'recurrente', indícalo con 🔁 y "
         "su periodicidad (p. ej. «Cuenta de cobro COLEF 🔁 recurrente (mensual)»).\n"
         f"- Cuadernos: {', '.join(cuadernos) or '(ninguno)'}.\n"
@@ -218,7 +218,10 @@ def interpret(
         contenido = getattr(m, "texto", None) or m.get("texto")
         if rol in ("user", "assistant") and contenido:
             messages.append({"role": rol, "content": contenido})
-    messages.append({"role": "user", "content": texto})
+    # La fecha va en el mensaje (no en el system prompt): así el prefijo
+    # system+tools es estable y Ollama reutiliza su caché entre peticiones.
+    ahora = now_local().isoformat(timespec="minutes")
+    messages.append({"role": "user", "content": f"{texto}\n[ahora: {ahora}]"})
 
     resp = provider.chat(messages, tools)
     # Usa las tool calls nativas; si no hay, rescata las que el modelo pudo haber
@@ -237,10 +240,8 @@ def interpret(
                 {
                     "id": f"call_{i}",
                     "type": "function",
-                    "function": {
-                        "name": tc.name,
-                        "arguments": json.dumps(tc.arguments, ensure_ascii=False),
-                    },
+                    # arguments como objeto: la API nativa de Ollama lo exige así
+                    "function": {"name": tc.name, "arguments": tc.arguments},
                 }
                 for i, tc in enumerate(tool_calls)
             ],

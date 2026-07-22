@@ -36,31 +36,66 @@ class LLMProvider(Protocol):
     ) -> LLMResponse: ...
 
 
+# Bloques de razonamiento de Qwen3 en el contenido (se descartan siempre).
+_THINK_RE = re.compile(r"<think>.*?</think>\s*", re.DOTALL)
+
+
 class RealLLMProvider:
-    """Habla con un endpoint OpenAI-compatible (Ollama/Qwen)."""
+    """Habla con Ollama por su API NATIVA (/api/chat).
 
-    def __init__(self, base_url: str, model: str, api_key: str) -> None:
-        from openai import OpenAI  # import perezoso
+    Se usa la nativa (y no la OpenAI-compatible) por dos razones críticas:
+    - `options.num_ctx` por petición: el default de Ollama (4096) TRUNCABA
+      nuestro prompt (~7k tokens con 67 tools) y el modelo perdía reglas y
+      herramientas — fuente de gran parte de la inestabilidad observada.
+    - `think: false`: apaga de verdad el razonamiento largo de Qwen3 (el switch
+      suave /no_think por prompt no es confiable).
+    """
 
-        self._client = OpenAI(base_url=base_url, api_key=api_key)
+    def __init__(
+        self,
+        base_url: str,
+        model: str,
+        api_key: str,  # no se usa en la API nativa; se conserva por firma
+        no_think: bool = True,
+        num_ctx: int = 12288,
+    ) -> None:
+        import httpx  # import perezoso
+
+        # llm_base_url viene como http://host:11434/v1 → raíz nativa sin /v1
+        self._root = base_url.rstrip("/").removesuffix("/v1")
+        self._http = httpx.Client(timeout=300.0)
         self._model = model
+        self._no_think = no_think
+        self._num_ctx = num_ctx
 
     def chat(self, messages: list[dict], tools: list[dict]) -> LLMResponse:
-        resp = self._client.chat.completions.create(
-            model=self._model,
-            messages=messages,
-            tools=tools or None,
-            temperature=0,
-        )
-        msg = resp.choices[0].message
+        payload: dict[str, Any] = {
+            "model": self._model,
+            "messages": messages,
+            "stream": False,
+            "options": {"temperature": 0, "num_ctx": self._num_ctx},
+        }
+        if self._no_think:
+            payload["think"] = False
+        if tools:
+            payload["tools"] = tools
+        r = self._http.post(f"{self._root}/api/chat", json=payload)
+        r.raise_for_status()
+        msg = r.json().get("message") or {}
         calls: list[ToolCall] = []
-        for tc in msg.tool_calls or []:
-            try:
-                args = json.loads(tc.function.arguments or "{}")
-            except json.JSONDecodeError:
-                args = {}
-            calls.append(ToolCall(name=tc.function.name, arguments=args))
-        return LLMResponse(content=msg.content, tool_calls=calls)
+        for tc in msg.get("tool_calls") or []:
+            fn = tc.get("function") or {}
+            args = fn.get("arguments") or {}
+            if isinstance(args, str):  # por si llegara serializado
+                try:
+                    args = json.loads(args)
+                except json.JSONDecodeError:
+                    args = {}
+            calls.append(ToolCall(name=fn.get("name", ""), arguments=args))
+        content = msg.get("content") or None
+        if content:
+            content = _THINK_RE.sub("", content).strip()
+        return LLMResponse(content=content, tool_calls=calls)
 
 
 # --- Backend fake: intérprete determinista ---
@@ -161,5 +196,11 @@ class FakeLLMProvider:
 def get_llm_provider() -> LLMProvider:
     s = get_settings()
     if s.llm_backend == "real":
-        return RealLLMProvider(s.llm_base_url, s.llm_model, s.llm_api_key)
+        return RealLLMProvider(
+            s.llm_base_url,
+            s.llm_model,
+            s.llm_api_key,
+            no_think=s.llm_no_think,
+            num_ctx=s.llm_num_ctx,
+        )
     return FakeLLMProvider()

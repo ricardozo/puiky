@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     llm_base_url: str = "http://localhost:11434/v1"  # Ollama por defecto
     llm_model: str = "qwen3:14b"
     llm_api_key: str = "ollama"  # Ollama ignora la clave; el SDK la exige
+    # Desactiva el "modo pensamiento" de Qwen3 (razonamiento largo e invisible
+    # antes de cada respuesta): mucho más rápido. Poner false para revertir.
+    llm_no_think: bool = True
+    # Ventana de contexto por petición. El default de Ollama (4096) trunca
+    # nuestro prompt (~7k tokens con todas las tools) y degrada al modelo.
+    llm_num_ctx: int = 12288
 
     # --- Transcripción (Whisper) ---
     # "real" (faster-whisper) o "fake" (texto fijo, para probar el flujo).
