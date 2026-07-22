@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Manual de Puiky</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    color: #22312e; line-height: 1.55; max-width: 720px;
+    margin: 0 auto; padding: 24px; font-size: 11.5pt;
+  }
+  h1, h2 { font-family: Georgia, "Times New Roman", serif; color: #17403d; }
+  h1 { font-size: 24pt; margin: 0 0 2px; }
+  .tagline { color: #b08a2e; letter-spacing: 2px; text-transform: uppercase;
+    font-size: 8.5pt; font-weight: 600; margin-bottom: 18px; }
+  h2 { font-size: 14.5pt; margin: 22px 0 8px; border-bottom: 2px solid #d8e4e0;
+    padding-bottom: 4px; }
+  p { margin: 6px 0; }
+  ul, ol { margin: 6px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  .frase { background: #eef4f2; border-left: 3px solid #2f6f6d; padding: 2px 10px;
+    border-radius: 4px; display: inline-block; margin: 2px 0; font-style: italic; }
+  .cajita { background: #f4f7f6; border: 1px solid #d8e4e0; border-radius: 10px;
+    padding: 12px 16px; margin: 10px 0; }
+  .dato { background: #fdf6e3; border: 1px dashed #b08a2e; border-radius: 8px;
+    padding: 10px 14px; margin: 10px 0; }
+  code { background: #eef4f2; padding: 1px 6px; border-radius: 4px;
+    font-family: Consolas, monospace; font-size: 10.5pt; }
+  strong { color: #17403d; }
+  .seccion { margin: 4px 0; }
+  .seccion b { color: #2f6f6d; }
+  .footer { margin-top: 26px; padding-top: 10px; border-top: 1px solid #d8e4e0;
+    color: #6a7b76; font-size: 10pt; text-align: center; }
+  @media print { body { padding: 0; } h2 { page-break-after: avoid; }
+    .cajita, .dato { page-break-inside: avoid; } }
+</style>
+</head>
+<body>
+
+<h1>Manual de Puiky 🧠</h1>
+<div class="tagline">Tu segundo cerebro</div>
+
+<p>Puiky te ayuda a recordar y organizar tu vida: notas, tareas, plata, mercado y
+recordatorios. Le puedes <strong>hablar por Telegram</strong> (texto o audio) o
+usarlo desde la <strong>página web</strong>. Todo lo tuyo es privado: cada
+persona ve solo lo suyo.</p>
+
+<h2>1 · Entrar por primera vez</h2>
+<ol>
+  <li>Abre <strong>https://puiky.iconred.co</strong> en el celular o computador.</li>
+  <li>Entra con el <strong>usuario y la clave temporal</strong> que te dieron.</li>
+  <li><strong>Cambia tu clave</strong>: abajo en el menú, toca tu
+      <strong>nombre de usuario 🔑</strong> → escribe la actual y la nueva.</li>
+</ol>
+
+<h2>2 · Conectar el bot de Telegram (lo mejor de Puiky)</h2>
+<ol>
+  <li>En Telegram, busca el bot: <strong>@⟨nombre-del-bot⟩</strong>.</li>
+  <li>Envíale: <code>/vincular ⟨tu-código⟩</code> (te lo dan con tu usuario).</li>
+  <li>¡Ya! Desde ahora <strong>le escribes o le mandas audios</strong> 🎙️.</li>
+</ol>
+
+<h2>3 · Háblale con naturalidad (ejemplos)</h2>
+
+<p><strong>Plata:</strong></p>
+<ul>
+  <li><span class="frase">"Gasté 25 mil en el almuerzo con Nequi"</span></li>
+  <li><span class="frase">"Me pagaron la quincena, 2 millones en Bancolombia"</span></li>
+  <li><span class="frase">"¿Cuánto tengo en Nequi?"</span> ·
+      <span class="frase">"¿Cuánto he gastado este mes?"</span></li>
+</ul>
+
+<p><strong>Recordatorios y tareas:</strong></p>
+<ul>
+  <li><span class="frase">"Recuérdame mañana pagar el recibo de la luz"</span></li>
+  <li><span class="frase">"Recuérdame cada mes enviar el informe"</span> — ¡se repite solo!</li>
+  <li><span class="frase">"Crea una tarea: llamar al médico"</span></li>
+  <li><span class="frase">"¿Qué tengo pendiente?"</span> ← pregúntale esto cada mañana ☀️</li>
+</ul>
+
+<p><strong>Notas:</strong></p>
+<ul>
+  <li><span class="frase">"Anota que a mamá le gustó el perfume de lavanda"</span></li>
+  <li><span class="frase">"¿Qué había anotado sobre el regalo de mamá?"</span>
+      (busca por la idea, no necesitas la palabra exacta)</li>
+</ul>
+
+<p><strong>Mercado:</strong></p>
+<ul>
+  <li><span class="frase">"Voy a hacer mercado, arma la lista"</span></li>
+  <li><span class="frase">"Compré la leche a 6 mil"</span> ·
+      <span class="frase">"¿Qué me falta?"</span> ·
+      <span class="frase">"Cierra la compra con Nequi"</span></li>
+</ul>
+
+<div class="cajita">El bot también <strong>te avisa solo</strong>: cuando algo
+vence, cuando un pago está cerca o cuando te pasaste de un presupuesto. Si te
+pide confirmar algo (borrar, un monto muy grande), tócale el botón ✅ o
+Cancelar.</div>
+
+<h2>4 · La página web, sección por sección</h2>
+<p class="seccion">📝 <b>Notas</b> — tus apuntes en cuadernos. El buscador encuentra por significado.</p>
+<p class="seccion">📋 <b>Proyectos</b> — agrupa tus metas (un viaje, una remodelación). Cada proyecto tiene su tablero para arrastrar tareas: Planeada → En ejecución → Terminada.</p>
+<p class="seccion">✅ <b>Tareas</b> — <b>tu vista de cada día</b>: lo pendiente agrupado por proyecto, con tu lista 🏠 Personal de primera. Marca el cuadrito ☑ cuando hagas algo.</p>
+<p class="seccion">💰 <b>Finanzas</b> — tus cuentas y movimientos. Gasto por categoría mes a mes, presupuestos y descarga a Excel.</p>
+<p class="seccion">🛒 <b>Mercado</b> — tu lista del súper. Puiky aprende cada cuánto compras y te avisa cuándo reponer. Con "Iniciar compra" marcas lo del carrito y el gasto queda registrado solo.</p>
+<p class="seccion">🔁 <b>Responsabilidades</b> — tus pagos fijos (arriendo, suscripciones). Al tocar "Registrar pago", el gasto se anota solo y la fecha salta al mes siguiente.</p>
+<p class="seccion">⏰ <b>Recordatorios</b> — lo que Puiky te está recordando. <b>Resolver</b> cuando ya lo hiciste, o <b>Posponer</b> para mañana.</p>
+
+<h2>5 · Trucos</h2>
+<ul>
+  <li>🎙️ <strong>El audio es el camino</strong>: la nota de voz es más rápida que
+      escribir. Di los números con "mil" separado: <em>"veinte mil"</em>, <em>"130 mil"</em>.</li>
+  <li>La pregunta mágica: <strong>"¿Qué tengo pendiente?"</strong></li>
+  <li>Lo que se repite (un pago, un informe, regar las plantas) márcalo
+      <strong>recurrente</strong> y olvídate: Puiky lo trae de vuelta cada vez.</li>
+  <li>El bot a veces tarda <strong>unos segundos</strong> — está pensando, dale chance.</li>
+  <li>¿Gasto equivocado? En la web lo <strong>editas o borras</strong>
+      (Finanzas → Movimientos → ✎ / ✕) y el saldo se corrige solo.</li>
+</ul>
+
+<div class="dato"><strong>Tus datos:</strong><br>
+Usuario: <strong>____________</strong> · Clave temporal: <strong>____________</strong><br>
+Código de Telegram: <code>/vincular ____________</code></div>
+
+<div class="footer">¿Dudas o algo raro? Escríbele a Ricardo 😄</div>
+
+</body>
+</html>
