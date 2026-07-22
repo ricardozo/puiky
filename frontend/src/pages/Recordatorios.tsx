@@ -49,10 +49,11 @@ export default function Recordatorios() {
   const [cargando, setCargando] = useState(true)
   const navigate = useNavigate()
 
-  // Por defecto: solo los que ya llegaron (evita mostrar la escalera de avisos
-  // futuros). Con "Ver resueltos": el histórico resuelto.
+  // Trae todos los no resueltos (o los resueltos, con el check); el filtrado de
+  // qué se muestra dónde (vencidos vs próximos) se hace abajo.
   const cargar = () =>
-    (verResueltos ? api.listReminders(true) : api.listDueReminders())
+    api
+      .listReminders(verResueltos ? true : false)
       .then(setReminders)
       .finally(() => setCargando(false))
 
@@ -87,12 +88,30 @@ export default function Recordatorios() {
 
   const ahora = Date.now()
 
-  // Vista por defecto: escalera colapsada a un aviso por origen. Con "Ver
-  // resueltos" mostramos el histórico completo, sin colapsar.
-  const visibles = useMemo(
-    () => (verResueltos ? reminders : colapsarPorOrigen(reminders)),
-    [reminders, verResueltos]
-  )
+  // Vista por defecto: solo los que ya llegaron, con la escalera colapsada a un
+  // aviso por origen. Con "Ver resueltos": el histórico completo, sin colapsar.
+  const visibles = useMemo(() => {
+    if (verResueltos) return reminders
+    const vencidos = reminders.filter(
+      (r) => new Date(efectivo(r)).getTime() <= ahora
+    )
+    return colapsarPorOrigen(vencidos)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reminders, verResueltos])
+
+  // Próximos: recordatorios MANUALES cuyo momento aún no llega (los de la
+  // escalera del scheduler no van aquí; aparecerán arriba cuando toque).
+  const proximos = useMemo(() => {
+    if (verResueltos) return []
+    return reminders
+      .filter(
+        (r) => !r.origen_tipo && new Date(efectivo(r)).getTime() > ahora
+      )
+      .sort(
+        (a, b) => new Date(efectivo(a)).getTime() - new Date(efectivo(b)).getTime()
+      )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reminders, verResueltos])
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -191,7 +210,9 @@ export default function Recordatorios() {
       {cargando ? (
         <p className="text-faint">Cargando…</p>
       ) : visibles.length === 0 ? (
-        <p className="text-faint">Sin recordatorios.</p>
+        <p className="text-faint">
+          {proximos.length > 0 ? 'Nada pendiente por ahora.' : 'Sin recordatorios.'}
+        </p>
       ) : (
         <ul className="space-y-2">
           {visibles.map((r) => {
@@ -257,6 +278,45 @@ export default function Recordatorios() {
             )
           })}
         </ul>
+      )}
+
+      {proximos.length > 0 && (
+        <div className="space-y-2 pt-2">
+          <h3 className="eyebrow">Próximos</h3>
+          <p className="text-xs text-faint">
+            Aún no llega su hora; subirán a la lista cuando toque (y el bot avisará).
+          </p>
+          <ul className="space-y-2">
+            {proximos.map((r) => (
+              <li
+                key={r.id}
+                className="group card px-4 py-2.5 flex items-center justify-between gap-3 opacity-80"
+              >
+                <div className="min-w-0">
+                  <p className="truncate">
+                    {r.texto}
+                    {r.recurrencia && (
+                      <span className="badge ml-2 text-xs">🔁 {r.recurrencia}</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-faint mt-0.5">
+                    {new Date(efectivo(r)).toLocaleString('es-CO')}
+                  </p>
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!window.confirm('¿Eliminar este recordatorio?')) return
+                    await api.deleteReminder(r.id)
+                    cargar()
+                  }}
+                  className="opacity-0 group-hover:opacity-100 text-faint hover:text-[color:var(--c-danger)] transition shrink-0"
+                >
+                  ✕
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   )
