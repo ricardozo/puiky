@@ -15,7 +15,7 @@ la **página web**. Todo lo tuyo es privado: cada persona ve solo lo suyo.
 
 ## 2 · Conectar el bot de Telegram (lo mejor de Puiky)
 
-1. En Telegram, busca el bot de Puiky: **@puiky**.
+1. En Telegram, busca el bot de Puiky: **@puiky_ricardozo_bot**.
 2. Envíale: `/vincular ⟨tu-código⟩` (el código te lo dan junto con tu usuario).
 3. ¡Ya! Desde ahora **le escribes o le mandas audios** y él hace el resto.
 
