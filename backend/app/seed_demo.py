@@ -117,6 +117,10 @@ def sembrar(db: Session) -> None:
     db.add_all([pf_casa, pf_clientes])
     db.flush()
 
+    proj_personal = Project(nombre="Personal", es_personal=True, estado="activo")
+    db.add(proj_personal)
+    db.flush()
+
     proj_cocina = Project(
         nombre="Remodelación de la cocina", portfolio_id=pf_casa.id, estado="activo",
         fecha_inicio=hoy - timedelta(days=20), fecha_fin=hoy + timedelta(days=40),
@@ -150,6 +154,11 @@ def sembrar(db: Session) -> None:
     tarea(proj_colef, "Cuenta de cobro COLEF", "en_ejecucion", dias=5, recurrencia="mensual",
           desc="Pasar la cuenta de cobro del mes.")
     tarea(proj_colef, "Enviar informe mensual", "planeada", dias=8, recurrencia="mensual")
+
+    tarea(proj_personal, "Sacar cita médica de los niños", "planeada", dias=0)
+    tarea(proj_personal, "Llamar al plomero", "planeada", dias=-1)
+    tarea(proj_personal, "Renovar el pasaporte", "planeada", dias=20)
+    tarea(proj_personal, "Regar las plantas", "planeada", dias=1, recurrencia="semanal")
     db.flush()
 
     for i, (txt, hecho) in enumerate(

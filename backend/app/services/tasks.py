@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.projects import Project
 from app.models.tasks import ChecklistItem, Task
 from app.schemas.tasks import ChecklistItemCreate, ChecklistItemUpdate, TaskCreate, TaskUpdate
+from app.services.projects import proyecto_personal
 from app.services.recurrence import siguiente_vencimiento
 
 TERMINADA = "terminada"
@@ -74,11 +75,13 @@ def _aplicar_progreso_checklist(task: Task) -> None:
 
 def create_task(db: Session, data: TaskCreate) -> Task:
     _validar_proyecto(db, data.project_id)
+    # Sin proyecto explícito, la tarea cae en el proyecto «Personal».
+    project_id = data.project_id or proyecto_personal(db).id
     task = Task(
         titulo=data.titulo,
         descripcion=data.descripcion,
         notas=data.notas,
-        project_id=data.project_id,
+        project_id=project_id,
         estado=data.estado.value,
         avance_pct=data.avance_pct,
         fecha_limite=data.fecha_limite,

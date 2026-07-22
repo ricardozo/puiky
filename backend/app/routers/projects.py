@@ -63,6 +63,7 @@ def ver_proyecto(
         portfolio_id=proyecto.portfolio_id,
         fecha_inicio=proyecto.fecha_inicio,
         fecha_fin=proyecto.fecha_fin,
+        es_personal=proyecto.es_personal,
         total_tareas=proyecto.total_tareas,  # type: ignore[attr-defined]
         tareas_terminadas=proyecto.tareas_terminadas,  # type: ignore[attr-defined]
         avance=proyecto.avance,  # type: ignore[attr-defined]

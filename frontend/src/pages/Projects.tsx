@@ -258,7 +258,10 @@ function Detalle({
               className="group card cursor-pointer p-4 hover:border-teal transition"
             >
               <div className="flex items-start justify-between gap-2">
-                <div className="font-medium">{p.nombre}</div>
+                <div className="font-medium">
+                  {p.es_personal && '🏠 '}
+                  {p.nombre}
+                </div>
                 <span className={`pill shrink-0 ${colorEstado[p.estado] ?? 'pill-mute'}`}>
                   {p.estado}
                 </span>

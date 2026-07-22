@@ -51,6 +51,19 @@ def _validar_portafolio(db: Session, portfolio_id: uuid.UUID | None) -> None:
         raise ValueError("El portafolio indicado no existe")
 
 
+def proyecto_personal(db: Session) -> Project:
+    """El proyecto «Personal» del inquilino (lo crea si no existe). Las tareas
+    creadas sin proyecto caen aquí."""
+    p = db.execute(
+        select(Project).where(Project.es_personal.is_(True))
+    ).scalars().first()
+    if p is None:
+        p = Project(nombre="Personal", es_personal=True)
+        db.add(p)
+        db.flush()
+    return p
+
+
 def _renombrar_cuaderno(db: Session, nombre_viejo: str, nombre_nuevo: str) -> None:
     """Mantiene el cuaderno homónimo del proyecto en sincronía con su nombre."""
     nb = db.execute(

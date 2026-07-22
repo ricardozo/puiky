@@ -79,6 +79,7 @@ export interface Project {
   portfolio_id: string | null
   fecha_inicio: string | null
   fecha_fin: string | null
+  es_personal: boolean
   total_tareas: number
   tareas_terminadas: number
   avance: number | null
@@ -367,10 +368,11 @@ export const api = {
     request<void>(`/portfolios/${id}`, { method: 'DELETE' }),
 
   // Tareas
-  createTask: (titulo: string, projectId: string) =>
+  createTask: (titulo: string, projectId?: string | null) =>
     request<Task>('/tasks', {
       method: 'POST',
-      body: JSON.stringify({ titulo, project_id: projectId }),
+      // Sin project_id, el backend la asigna al proyecto Personal.
+      body: JSON.stringify({ titulo, project_id: projectId || null }),
     }),
   updateTaskEstado: (id: string, estado: string) =>
     request<Task>(`/tasks/${id}`, {

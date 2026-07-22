@@ -47,6 +47,7 @@ class ProjectOut(BaseModel):
     portfolio_id: uuid.UUID | None
     fecha_inicio: date | None = None
     fecha_fin: date | None = None
+    es_personal: bool = False
     # Derivados (los adjunta el servicio a partir de las tareas).
     total_tareas: int = 0
     tareas_terminadas: int = 0

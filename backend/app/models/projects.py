@@ -3,7 +3,7 @@
 import uuid
 from datetime import date
 
-from sqlalchemy import UUID, Date, ForeignKey, Index, String, Text, text
+from sqlalchemy import UUID, Boolean, Date, ForeignKey, Index, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -26,6 +26,11 @@ class Project(Base):
     )
     fecha_inicio: Mapped[date | None] = mapped_column(Date, nullable=True)
     fecha_fin: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # El proyecto «Personal» del inquilino (uno solo): recibe las tareas sin
+    # proyecto. Flag en vez de nombre para sobrevivir renombres.
+    es_personal: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
     # Portafolio al que pertenece (opcional: null = sin portafolio).
     portfolio_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
