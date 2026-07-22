@@ -555,8 +555,10 @@ function NotasVinculadas({
 
   const crear = async () => {
     if (!cuerpo.trim()) return
-    const n = await api.createNote(cuerpo.trim(), null, titulo.trim() || null)
-    await api.linkNote(n.id, entidadTipo, entidadId)
+    // Una sola petición: la nota nace ya vinculada (nunca queda huérfana).
+    await api.createNote(
+      cuerpo.trim(), null, titulo.trim() || null, entidadTipo, entidadId
+    )
     setTitulo('')
     setCuerpo('')
     cargar()

@@ -270,7 +270,9 @@ export const api = {
   createNote: (
     contenido: string,
     notebookId?: string | null,
-    titulo?: string | null
+    titulo?: string | null,
+    entidadTipo?: string,
+    entidadId?: string
   ) =>
     request<Note>('/notes', {
       method: 'POST',
@@ -278,6 +280,10 @@ export const api = {
         contenido,
         notebook_id: notebookId ?? null,
         titulo: titulo ?? null,
+        // Vínculo atómico opcional: la nota nace ya ligada (y en el cuaderno
+        // del proyecto) — evita huérfanas si una 2ª petición fallara.
+        entidad_tipo: entidadTipo ?? null,
+        entidad_id: entidadId ?? null,
       }),
     }),
   updateNote: (

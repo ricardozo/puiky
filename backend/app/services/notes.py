@@ -37,9 +37,38 @@ def _texto_embedding(titulo: str | None, contenido: str) -> str:
     return f"{titulo}\n{contenido}" if titulo else contenido
 
 
+def _resolver_entidad(db: Session, tipo: str, entidad_id: uuid.UUID):
+    """Valida y devuelve la entidad destino de un vínculo (o ValueError)."""
+    modelo = _MODELOS_VALIDABLES.get(tipo)
+    entidad = db.get(modelo, entidad_id) if modelo is not None else None
+    if modelo is not None and entidad is None:
+        raise ValueError(f"La entidad {tipo} indicada no existe")
+    return entidad
+
+
+def _aplicar_vinculo(
+    db: Session, note: Note, tipo: str, entidad_id: uuid.UUID, entidad
+) -> NoteLink:
+    """Crea el NoteLink y ubica la nota en el cuaderno del proyecto (directo o
+    vía la tarea). NO hace commit: el llamante decide la transacción."""
+    if tipo == "project" and entidad is not None:
+        note.notebook_id = cuaderno_de_proyecto(db, entidad).id
+    elif tipo == "task" and entidad is not None and entidad.project_id is not None:
+        proyecto = db.get(Project, entidad.project_id)
+        if proyecto is not None:
+            note.notebook_id = cuaderno_de_proyecto(db, proyecto).id
+    link = NoteLink(note_id=note.id, entidad_tipo=tipo, entidad_id=entidad_id)
+    db.add(link)
+    return link
+
+
 def create_note(db: Session, data: NoteCreate) -> Note:
-    """Crea una hoja generando y guardando su embedding (título + cuerpo)."""
+    """Crea una hoja generando y guardando su embedding (título + cuerpo).
+    Si trae entidad_tipo/entidad_id, nace ya vinculada (misma transacción)."""
     _validar_cuaderno(db, data.notebook_id)
+    entidad = None
+    if data.entidad_tipo is not None and data.entidad_id is not None:
+        entidad = _resolver_entidad(db, data.entidad_tipo.value, data.entidad_id)
     embedding = get_embedder().embed_document(
         _texto_embedding(data.titulo, data.contenido)
     )
@@ -50,6 +79,9 @@ def create_note(db: Session, data: NoteCreate) -> Note:
         notebook_id=data.notebook_id,
     )
     db.add(note)
+    db.flush()
+    if data.entidad_tipo is not None and data.entidad_id is not None:
+        _aplicar_vinculo(db, note, data.entidad_tipo.value, data.entidad_id, entidad)
     db.commit()
     db.refresh(note)
     return note
@@ -202,23 +234,8 @@ def add_link(
     if note is None:
         return None
     tipo = data.entidad_tipo.value
-    modelo = _MODELOS_VALIDABLES.get(tipo)
-    entidad = db.get(modelo, data.entidad_id) if modelo is not None else None
-    if modelo is not None and entidad is None:
-        raise ValueError(f"La entidad {tipo} indicada no existe")
-    if tipo == "project" and entidad is not None:
-        note.notebook_id = cuaderno_de_proyecto(db, entidad).id
-    elif tipo == "task" and entidad is not None and entidad.project_id is not None:
-        # Las notas de una tarea van al cuaderno del proyecto de esa tarea.
-        proyecto = db.get(Project, entidad.project_id)
-        if proyecto is not None:
-            note.notebook_id = cuaderno_de_proyecto(db, proyecto).id
-    link = NoteLink(
-        note_id=note_id,
-        entidad_tipo=tipo,
-        entidad_id=data.entidad_id,
-    )
-    db.add(link)
+    entidad = _resolver_entidad(db, tipo, data.entidad_id)
+    link = _aplicar_vinculo(db, note, tipo, data.entidad_id, entidad)
     db.commit()
     db.refresh(link)
     return link

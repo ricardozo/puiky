@@ -27,6 +27,10 @@ class NoteCreate(BaseModel):
     contenido: str = Field(min_length=1)
     titulo: str | None = Field(default=None, max_length=200)
     notebook_id: uuid.UUID | None = None
+    # Vínculo opcional al crear (atómico): la nota nace ya ligada a la entidad
+    # (y, si es proyecto/tarea, dentro del cuaderno del proyecto).
+    entidad_tipo: EntidadTipo | None = None
+    entidad_id: uuid.UUID | None = None
 
 
 class NoteUpdate(BaseModel):

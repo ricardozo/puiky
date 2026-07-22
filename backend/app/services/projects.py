@@ -92,6 +92,12 @@ def create_project(db: Session, data: ProjectCreate) -> Project:
         fecha_fin=data.fecha_fin,
     )
     db.add(project)
+    db.flush()
+    # El cuaderno del proyecto nace con el proyecto (no con la primera nota):
+    # así aparece de una vez como destino al guardar notas.
+    from app.services.notes import cuaderno_de_proyecto
+
+    cuaderno_de_proyecto(db, project)
     db.commit()
     db.refresh(project)
     return _adjuntar_avance(project, 0, 0)
