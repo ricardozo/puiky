@@ -256,6 +256,11 @@ export const api = {
       body: JSON.stringify({ usuario, password }),
     }),
   me: () => request<{ usuario: string }>('/auth/me'),
+  changePassword: (actual: string, nueva: string) =>
+    request<void>('/auth/password', {
+      method: 'POST',
+      body: JSON.stringify({ actual, nueva }),
+    }),
   listNotes: (opts?: { notebookId?: string; sinCuaderno?: boolean }) => {
     let q = ''
     if (opts?.sinCuaderno) q = '?sin_cuaderno=true'
