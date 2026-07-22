@@ -21,8 +21,9 @@ depends_on: str | None = None
 
 
 def upgrade() -> None:
-    op.add_column("project", sa.Column("fecha_inicio", sa.Date(), nullable=True))
-    op.add_column("project", sa.Column("fecha_fin", sa.Date(), nullable=True))
+    # IF NOT EXISTS: en inquilinos recién aprovisionados el baseline ya las crea.
+    op.execute("ALTER TABLE project ADD COLUMN IF NOT EXISTS fecha_inicio DATE")
+    op.execute("ALTER TABLE project ADD COLUMN IF NOT EXISTS fecha_fin DATE")
 
 
 def downgrade() -> None:

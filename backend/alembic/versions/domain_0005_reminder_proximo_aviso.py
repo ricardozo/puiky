@@ -27,9 +27,9 @@ depends_on: str | None = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "reminder",
-        sa.Column("proximo_aviso", sa.DateTime(timezone=True), nullable=True),
+    # IF NOT EXISTS: en inquilinos recién aprovisionados el baseline ya la crea.
+    op.execute(
+        "ALTER TABLE reminder ADD COLUMN IF NOT EXISTS proximo_aviso TIMESTAMPTZ"
     )
     # Resetea el bookkeeping viejo del scheduler (que vivía en pospuesto_para).
     op.execute(

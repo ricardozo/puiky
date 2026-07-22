@@ -26,14 +26,10 @@ depends_on: str | None = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "project",
-        sa.Column(
-            "es_personal",
-            sa.Boolean(),
-            server_default=sa.text("false"),
-            nullable=False,
-        ),
+    # IF NOT EXISTS: en inquilinos recién aprovisionados el baseline ya la crea.
+    op.execute(
+        "ALTER TABLE project ADD COLUMN IF NOT EXISTS es_personal BOOLEAN "
+        "NOT NULL DEFAULT false"
     )
     # Si ya existe un proyecto llamado «Personal», se adopta; si no, se crea.
     op.execute(

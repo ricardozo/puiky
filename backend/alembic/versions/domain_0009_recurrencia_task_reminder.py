@@ -21,9 +21,10 @@ depends_on: str | None = None
 
 
 def upgrade() -> None:
-    op.add_column("task", sa.Column("recurrencia", sa.String(length=30), nullable=True))
-    op.add_column(
-        "reminder", sa.Column("recurrencia", sa.String(length=30), nullable=True)
+    # IF NOT EXISTS: en inquilinos recién aprovisionados el baseline ya las crea.
+    op.execute("ALTER TABLE task ADD COLUMN IF NOT EXISTS recurrencia VARCHAR(30)")
+    op.execute(
+        "ALTER TABLE reminder ADD COLUMN IF NOT EXISTS recurrencia VARCHAR(30)"
     )
 
 

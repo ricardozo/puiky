@@ -21,6 +21,13 @@ depends_on: str | None = None
 
 
 def upgrade() -> None:
+    # Idempotente: en un inquilino RECIÉN aprovisionado, el baseline crea las
+    # tablas desde el modelo actual (que ya trae estas columnas y sus FKs); aquí
+    # solo se agregan si faltan (inquilinos que venían de versiones previas).
+    insp = sa.inspect(op.get_bind())
+    columnas = {c["name"] for c in insp.get_columns("responsibility")}
+    if "account_id" in columnas:
+        return
     op.add_column(
         "responsibility",
         sa.Column("account_id", sa.UUID(as_uuid=True), nullable=True),
