@@ -147,7 +147,11 @@ async def _responder_interpretacion(
         )
         return
 
-    await update.message.reply_text(res.get("respuesta") or "Hecho.")
+    # El modelo escribe negrillas Markdown (**así**) que Telegram muestra como
+    # asteriscos literales; se limpian para una respuesta prolija.
+    await update.message.reply_text(
+        (res.get("respuesta") or "Hecho.").replace("**", "")
+    )
 
 
 _MAX_HISTORIAL = 8  # últimos 8 mensajes (~4 intercambios)

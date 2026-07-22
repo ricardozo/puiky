@@ -178,6 +178,7 @@ function Home({
                   <span className="ml-2">📓 {nombreCuaderno(n.notebook_id)}</span>
                 )}
               </div>
+              <EnlacesNota nota={n} />
             </button>
           ))}
         </div>

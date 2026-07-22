@@ -271,4 +271,5 @@ def search_notes(
     distancia = Note.embedding.cosine_distance(query_vec)
     stmt = select(Note, distancia.label("dist")).order_by(distancia).limit(limite)
     filas = db.execute(stmt).all()
+    _adjuntar_enlaces(db, [nota for nota, _ in filas])
     return [(nota, 1.0 - float(dist)) for nota, dist in filas]

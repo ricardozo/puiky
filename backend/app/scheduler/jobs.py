@@ -208,17 +208,32 @@ def generar_alertas_mercado(db: Session, ahora: datetime) -> int:
     return creados
 
 
+def en_silencio(hora: int, desde: int, hasta: int) -> bool:
+    """¿La hora cae en el horario de silencio? Soporta rangos que cruzan la
+    medianoche (p. ej. 21→7) y rangos diurnos (p. ej. 13→15)."""
+    if desde == hasta:
+        return False  # sin silencio
+    if desde > hasta:  # cruza medianoche
+        return hora >= desde or hora < hasta
+    return desde <= hora < hasta
+
+
 async def entregar_pendientes(
     db: Session,
     notifier: Notifier,
     chat_ids: set[int],
     ahora: datetime,
     realert_hours: int,
+    silencio_desde: int = 21,
+    silencio_hasta: int = 7,
 ) -> int:
     """Envía los recordatorios cuyo disparo efectivo ya llegó y aún no están
     resueltos. Insistencia: tras avisar, reprograma el próximo aviso en
-    `realert_hours` (via pospuesto_para) para que vuelva hasta que se resuelva."""
+    `realert_hours` (via pospuesto_para) para que vuelva hasta que se resuelva.
+    En horario de silencio no se envía nada (los pendientes salen después)."""
     if not chat_ids:
+        return 0
+    if en_silencio(ahora.hour, silencio_desde, silencio_hasta):
         return 0
     # Cadencia del bot: respeta el snooze del usuario (pospuesto_para) y su propia
     # marca de re-aviso (proximo_aviso), sin pisar una con la otra.

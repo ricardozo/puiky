@@ -51,6 +51,7 @@ def buscar_notas(
             creada=nota.creada,
             actualizada=nota.actualizada,
             similitud=similitud,
+            enlaces=getattr(nota, "enlaces", []),
         )
         for nota, similitud in resultados
     ]

@@ -81,6 +81,10 @@ class Settings(BaseSettings):
 
     # --- Scheduler (Fase 4) ---
     scheduler_poll_seconds: int = 60
+    # Horario de silencio del bot: no se ENVÍAN avisos entre estas horas
+    # (los pendientes no se pierden; salen al terminar el silencio).
+    notif_silencio_desde: int = 21  # 9 pm
+    notif_silencio_hasta: int = 7   # 7 am
     # Insistencia: cada cuántas horas se reitera un recordatorio sin resolver.
     reminder_realert_hours: int = 3
     # Anticipación escalonada (días antes del vencimiento), separada por coma.

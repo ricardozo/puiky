@@ -60,7 +60,13 @@ async def tick(notifier: Notifier) -> None:
             )
             total_m += jobs.generar_alertas_mercado(db, ahora)
             total_e += await jobs.entregar_pendientes(
-                db, notifier, chat_ids, ahora, s.reminder_realert_hours
+                db,
+                notifier,
+                chat_ids,
+                ahora,
+                s.reminder_realert_hours,
+                silencio_desde=s.notif_silencio_desde,
+                silencio_hasta=s.notif_silencio_hasta,
             )
 
     if total_c or total_a or total_m or total_e:
