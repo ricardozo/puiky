@@ -112,45 +112,63 @@ def generar_recordatorios_vencimientos(
     return creados
 
 
+def _plata(v) -> str:
+    return f"${v:,.0f}".replace(",", ".")
+
+
 def generar_alertas_presupuesto(
     db: Session, ahora: datetime, umbral: float
 ) -> int:
     """Crea una alerta (recordatorio) por cada presupuesto que cruce el umbral
-    del mes y no tenga ya una alerta sin resolver."""
+    del mes. Si el gasto vuelve a quedar bajo el umbral (p. ej. se corrigió un
+    movimiento), la alerta pendiente se auto-resuelve; si sigue arriba pero las
+    cifras cambiaron, el texto se actualiza (la insistencia repite el texto)."""
     creados = 0
+    cambios = False
     inicio, fin = _rango_mes(ahora.year, ahora.month)
     for b in db.execute(select(Budget)).scalars():
         gastado = _gasto_del_mes(db, b.category_id, inicio, fin)
-        if gastado < Decimal(str(umbral)) * b.tope:
-            continue
-        ya = db.execute(
-            select(Reminder.id).where(
+        alerta = db.execute(
+            select(Reminder).where(
                 Reminder.origen_tipo == "budget",
                 Reminder.origen_id == b.id,
                 Reminder.resuelto.is_(False),
             )
-        ).first()
-        if ya is not None:
+        ).scalars().first()
+
+        if gastado < Decimal(str(umbral)) * b.tope:
+            if alerta is not None:  # ya no aplica: se corrigió el gasto
+                alerta.resuelto = True
+                cambios = True
             continue
+
         if b.category_id is not None:
             cat = db.get(Category, b.category_id)
             ambito = f"en {cat.nombre}" if cat else "por categoría"
         else:
             ambito = "global del mes"
         pct = int(gastado / b.tope * 100) if b.tope else 0
+        texto = (
+            f"⚠️ Presupuesto {ambito}: llevas {_plata(gastado)} de "
+            f"{_plata(b.tope)} ({pct}%) este mes."
+        )
+
+        if alerta is not None:
+            if alerta.texto != texto:  # cifras al día para el próximo aviso
+                alerta.texto = texto
+                cambios = True
+            continue
+
         db.add(
             Reminder(
                 origen_tipo="budget",
                 origen_id=b.id,
-                texto=(
-                    f"⚠️ Presupuesto {ambito}: llevas {gastado:.0f} de "
-                    f"{b.tope:.0f} ({pct}%) este mes."
-                ),
+                texto=texto,
                 disparar_en=ahora,
             )
         )
         creados += 1
-    if creados:
+    if creados or cambios:
         db.commit()
     return creados
 
