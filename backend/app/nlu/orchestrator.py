@@ -30,6 +30,41 @@ _OBJ = re.compile(r"\{(?:[^{}]|\{[^{}]*\})*\}")
 
 _RECUERDAME = re.compile(r"\brecu[eé]rdame\b", re.IGNORECASE)
 
+# El usuario pide una ACCIÓN o una CONSULTA de datos: esos mensajes DEBEN
+# resolverse con tools. Si el modelo responde puro texto, no es de fiar.
+_PIDE_ACCION = re.compile(
+    r"\b(gast[eé]|pagu[eé]|compr[eé]|recib[íi]|me pagaron|transfier|recu[eé]rdame|"
+    r"an[oó]ta|apunta|crea|agrega|a[ñn]ade|registra|elimina|borra|marca|cierra|"
+    r"inicia|completa|pospon)\w*\b",
+    re.IGNORECASE,
+)
+_PIDE_DATOS = re.compile(
+    r"\b(saldo|cu[aá]nto (tengo|he gastado|llevo|debo)|movimientos|pendiente|"
+    r"qu[eé] (tengo|me (toca|falta))|mu[eé]strame|lista|mis (cuentas|tareas|gastos))\b",
+    re.IGNORECASE,
+)
+# El modelo AFIRMA haber hecho algo (patrón de confirmación).
+_AFIRMA_HECHO = re.compile(
+    r"\b(registrad|registr[eé]|he (creado|registrado|agendado|anotado|guardado)|"
+    r"agendad|anotad|guardad|cread[oa]|se (cre[oó]|registr[oó]|guard[oó]|agend[oó])|"
+    r"listo[:.]|saldo actual)\w*",
+    re.IGNORECASE,
+)
+
+
+def _respuesta_no_confiable(texto: str, contenido: str) -> bool:
+    """¿El modelo respondió puro texto donde DEBÍA usar tools?
+
+    Caso real: durante una degradación, el modelo dejó de emitir tool calls y,
+    imitando su propio historial («He registrado el gasto… saldo $X»), ALUCINÓ
+    confirmaciones con aritmética perfecta — sin ejecutar nada. Jamás se le
+    puede pasar al usuario un éxito no ejecutado ni datos no consultados."""
+    if _PIDE_ACCION.search(texto) and _AFIRMA_HECHO.search(contenido):
+        return True
+    if _PIDE_DATOS.search(texto) and re.search(r"\$\s?[\d.,]{4,}", contenido):
+        return True  # cifras de plata que no salieron de ninguna tool
+    return False
+
 # «130mil» pegado → «130 mil» (el modelo lo lee mucho mejor separado).
 _PEGADO = re.compile(r"(\d)(mil\b|mill[oó]n(?:es)?\b)", re.IGNORECASE)
 # Números dichos «en miles» y mención de millones, para validar magnitudes.
@@ -227,6 +262,18 @@ def interpret(
     # Usa las tool calls nativas; si no hay, rescata las que el modelo pudo haber
     # emitido como texto (Qwen a veces lo hace y la acción se perdería).
     tool_calls = resp.tool_calls or _tool_calls_desde_texto(resp.content)
+    if not tool_calls and _respuesta_no_confiable(texto, resp.content or ""):
+        # Reintento único: a veces la siguiente muestra sí llama la tool.
+        resp = provider.chat(messages, tools)
+        tool_calls = resp.tool_calls or _tool_calls_desde_texto(resp.content)
+        if not tool_calls:
+            return InterpretResult(
+                respuesta=(
+                    "No pude ejecutar eso ahora mismo (el intérprete no procesó "
+                    "la acción). Inténtalo de nuevo en un momento, o hazlo desde "
+                    "la web."
+                )
+            )
     if not tool_calls:
         return InterpretResult(respuesta=resp.content or "")
     tool_calls = _corregir_tool_calls(texto, tool_calls)

@@ -209,9 +209,19 @@ se corrigen **en código, después del tool call**:
   texto** en vez de usar el canal nativo → un regex lo rescata y lo ejecuta.
 - **Datos inventados:** categoría inexistente → cae a un valor seguro ('Otros')
   en vez de reventar; el usuario corrige después.
-- **Anti-patrón:** iterar el prompt infinitamente esperando obediencia.
+- **⚠️ Éxito alucinado (el fallo más peligroso):** durante una degradación, el
+  modelo dejó de emitir tool calls y, **imitando su propio historial** («He
+  registrado el gasto… saldo $X»), respondió confirmaciones completas con
+  aritmética perfecta — encadenó saldos calculándolos en contexto — **sin
+  ejecutar nada**. El usuario "registró" cuatro gastos que jamás existieron.
+  Guard determinista: si el mensaje **pide una acción o datos** (regex de verbos
+  y consultas) y el modelo respondió **puro texto sin tools**, se reintenta una
+  vez y, si insiste, se responde un fallo honesto — nunca se le pasa al usuario
+  un éxito no ejecutado ni cifras que no salieron de una tool.
+- **Anti-patrón:** iterar el prompt infinitamente esperando obediencia; y creer
+  que "si el modelo lo confirmó, lo hizo".
 - **Código:** `orchestrator.py::_corregir_tool_calls`, `_corregir_magnitud`,
-  `_tool_calls_desde_texto`; `tools.py::_resolver_categoria`.
+  `_tool_calls_desde_texto`, `_respuesta_no_confiable`; `tools.py::_resolver_categoria`.
 
 ### 4.11 Confirmación también para lo riesgoso (no solo lo destructivo)
 Además de los borrados (§4.6), las acciones **de dinero por encima de un umbral**
@@ -303,8 +313,12 @@ vencimientos, alertas de presupuesto, y entrega recordatorios con insistencia.
     se **auto-resuelven** y refrescan sus cifras cuando la causa cambia.
 16. **Sanitiza la salida por canal** (Markdown del modelo vs. lo que el canal
     renderiza de verdad).
+17. **Nunca confíes en un éxito que no ejecutaste.** Si el mensaje pedía una
+    acción o datos y el modelo respondió puro texto sin tools, NO lo entregues:
+    el modelo puede alucinar confirmaciones perfectas (imitando su historial,
+    con aritmética y todo). Reintenta una vez; si insiste, fallo honesto.
 
-Los primeros diez hacen que el agente se sienta **natural**; los últimos seis lo
+Los primeros diez hacen que el agente se sienta **natural**; los últimos siete lo
 hacen **confiable en producción**. Son la diferencia entre "un agente que llama
 funciones" y "un asistente al que le confías tu plata".
 
