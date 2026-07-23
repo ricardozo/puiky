@@ -170,6 +170,7 @@ export interface NuevaTransaccion {
   nota?: string | null
 }
 export interface EditarTransaccion {
+  tipo?: string // solo gasto ↔ ingreso (transferencias no cambian de tipo)
   monto?: number
   account_id?: string
   cuenta_destino_id?: string | null

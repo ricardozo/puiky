@@ -52,6 +52,7 @@ function EditorMovimiento({
   onGuardado: () => void
 }) {
   const esTransfer = tx.tipo === 'transferencia'
+  const [tipo, setTipo] = useState(tx.tipo)
   const [monto, setMonto] = useState(String(tx.monto))
   const [cuenta, setCuenta] = useState(tx.account_id)
   const [destino, setDestino] = useState(tx.cuenta_destino_id ?? '')
@@ -66,6 +67,7 @@ function EditorMovimiento({
     setError('')
     try {
       await api.updateTransaction(tx.id, {
+        tipo: esTransfer ? undefined : tipo,
         monto: Number(monto),
         account_id: cuenta,
         cuenta_destino_id: esTransfer ? destino : null,
@@ -92,7 +94,19 @@ function EditorMovimiento({
       >
         <div className="flex items-center justify-between">
           <h3 className="font-serif text-xl">Editar movimiento</h3>
-          <span className="badge">{tx.tipo}</span>
+          {esTransfer ? (
+            <span className="badge">{tx.tipo}</span>
+          ) : (
+            <select
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value)}
+              className="input w-auto py-1 text-sm"
+              title="Cambiar entre gasto e ingreso (corrige el saldo solo)"
+            >
+              <option value="gasto">gasto</option>
+              <option value="ingreso">ingreso</option>
+            </select>
+          )}
         </div>
 
         <label className="text-xs text-muted flex flex-col gap-1">

@@ -179,7 +179,15 @@ def update_transaction(db: Session, tx_id: uuid.UUID, data) -> Transaction | Non
         return None
 
     cambios = data.model_dump(exclude_unset=True)
-    tipo = tx.tipo  # inmutable
+    tipo_viejo = tx.tipo
+    tipo = cambios.get("tipo")
+    tipo = tipo.value if tipo is not None else tipo_viejo
+    if tipo != tipo_viejo and TRANSFERENCIA in (tipo, tipo_viejo):
+        # gasto↔ingreso se permite (corregir un registro al revés); una
+        # transferencia cambia de forma (destino) y no se convierte.
+        raise ValueError(
+            "Solo se puede cambiar el tipo entre gasto e ingreso"
+        )
 
     nuevo_monto = cambios.get("monto", tx.monto)
     nueva_cuenta = cambios.get("account_id", tx.account_id)
@@ -212,15 +220,16 @@ def update_transaction(db: Session, tx_id: uuid.UUID, data) -> Transaction | Non
         if db.get(Category, nueva_categoria) is None:
             raise ValueError("La categoría no existe")
 
-    # --- revertir el efecto anterior (con los valores viejos) ---
+    # --- revertir el efecto anterior (con los valores y el TIPO viejos) ---
     origen_old = db.get(Account, tx.account_id)
     destino_old = (
         db.get(Account, tx.cuenta_destino_id) if tx.cuenta_destino_id else None
     )
     if origen_old is not None:
-        _mover_saldos(tipo, tx.monto, origen_old, destino_old, signo=-1)
+        _mover_saldos(tipo_viejo, tx.monto, origen_old, destino_old, signo=-1)
 
     # --- aplicar los valores nuevos y su efecto ---
+    tx.tipo = tipo
     tx.monto = nuevo_monto
     tx.account_id = nueva_cuenta
     tx.category_id = nueva_categoria

@@ -307,6 +307,12 @@ def interpret(
             }
         )
 
+    # Operaciones de plata: confirmación determinista desde el resultado real
+    # (cifras garantizadas) y sin gastar la 2ª llamada al LLM.
+    directa = _confirmacion_dinero(acciones)
+    if directa is not None:
+        return InterpretResult(respuesta=directa, acciones=acciones)
+
     # Segunda llamada SIN tools: solo queremos la confirmación en texto.
     final = provider.chat(messages, [])
     respuesta = final.content or ""
@@ -315,6 +321,40 @@ def interpret(
     if not respuesta.strip() or _tool_calls_desde_texto(respuesta):
         respuesta = _confirmacion_fallback(acciones)
     return InterpretResult(respuesta=respuesta, acciones=acciones)
+
+
+def _plata(v) -> str:
+    try:
+        return f"{float(v):,.0f}".replace(",", ".")
+    except (TypeError, ValueError):
+        return str(v)
+
+
+def _confirmacion_dinero(acciones: list[Accion]) -> str | None:
+    """Confirmación DETERMINISTA para operaciones de plata: se arma desde el
+    resultado real de la tool (el modelo llegó a citar saldos inventados en la
+    2ª pasada). Además ahorra esa 2ª llamada al LLM. Devuelve None si alguna
+    acción no es de dinero o falló (ahí sí redacta el modelo)."""
+    partes: list[str] = []
+    for a in acciones:
+        r = a.resultado
+        if not (isinstance(r, dict) and r.get("ok")):
+            return None
+        if a.tool in ("registrar_gasto", "registrar_ingreso"):
+            verbo = "Gasto" if a.tool == "registrar_gasto" else "Ingreso"
+            partes.append(
+                f"✅ {verbo} de ${_plata(r['monto'])} en {r['categoria']} "
+                f"({r['cuenta']}). Saldo: ${_plata(r['saldo_cuenta'])}."
+            )
+        elif a.tool == "consultar_saldo":
+            partes.append(f"💰 {r['cuenta']}: ${_plata(r['saldo'])}.")
+        elif a.tool == "transferir":
+            partes.append(
+                f"✅ Transferencia de ${_plata(r['monto'])}: {r['origen']} → {r['destino']}."
+            )
+        else:
+            return None
+    return " ".join(partes) if partes else None
 
 
 def _confirmacion_fallback(acciones: list[Accion]) -> str:
