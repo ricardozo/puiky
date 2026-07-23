@@ -188,7 +188,8 @@ def generar_alertas_mercado(db: Session, ahora: datetime) -> int:
         if ya is not None:
             continue
         dias = p.dias_desde  # type: ignore[attr-defined]
-        cadencia = f"cada {p.cadencia_dias} días" if p.cadencia_dias else ""
+        efectiva = p.cadencia_efectiva  # type: ignore[attr-defined]
+        cadencia = f"cada {efectiva} días" if efectiva else ""
         cuando = (
             f" (el último fue hace {dias} días)"
             if dias is not None

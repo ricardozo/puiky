@@ -29,24 +29,61 @@ from app.services import finances as fin
 from app.timeutils import now_local
 
 
-def _ultimas_compras(db: Session) -> dict[uuid.UUID, date]:
+def _historial(db: Session) -> dict[uuid.UUID, list[MarketPurchase]]:
+    """Todas las compras agrupadas por producto, en orden cronológico."""
     filas = db.execute(
-        select(MarketPurchase.product_id, func.max(MarketPurchase.fecha)).group_by(
-            MarketPurchase.product_id
-        )
-    ).all()
-    return {pid: f for pid, f in filas}
+        select(MarketPurchase).order_by(MarketPurchase.fecha)
+    ).scalars()
+    out: dict[uuid.UUID, list[MarketPurchase]] = {}
+    for c in filas:
+        out.setdefault(c.product_id, []).append(c)
+    return out
 
 
-def _enriquecer(p: MarketProduct, ultima: date | None, hoy: date) -> MarketProduct:
+def _mediana(valores: list[int]) -> float:
+    orden = sorted(valores)
+    n = len(orden)
+    mitad = n // 2
+    return (orden[mitad - 1] + orden[mitad]) / 2 if n % 2 == 0 else orden[mitad]
+
+
+def _enriquecer(
+    p: MarketProduct, compras: list[MarketPurchase], hoy: date
+) -> MarketProduct:
+    fechas = sorted({c.fecha for c in compras})
+    ultima = fechas[-1] if fechas else None
     p.ultima_compra = ultima  # type: ignore[attr-defined]
     p.dias_desde = (hoy - ultima).days if ultima else None  # type: ignore[attr-defined]
-    if not p.activo or p.cadencia_dias is None:
+
+    # Ciclo aprendido: mediana de los días entre compras (robusta a outliers).
+    intervalos = [(b - a).days for a, b in zip(fechas, fechas[1:])]
+    ciclo = round(_mediana(intervalos)) if len(intervalos) >= 2 else None
+    p.ciclo_aprendido = ciclo  # type: ignore[attr-defined]
+    # La cadencia manual manda; si no hay, gobierna la aprendida.
+    efectiva = p.cadencia_dias or ciclo
+    p.cadencia_efectiva = efectiva  # type: ignore[attr-defined]
+
+    # Estadísticas de precio UNITARIO (precio de línea ÷ cantidad).
+    con_precio = [
+        c for c in compras if c.precio and c.precio > 0 and c.cantidad and c.cantidad > 0
+    ]
+    unitarios = [(c.precio / c.cantidad).quantize(Decimal("0.01")) for c in con_precio]
+    if unitarios:
+        p.precio_ultimo = unitarios[-1]  # type: ignore[attr-defined]
+        p.precio_min = min(unitarios)  # type: ignore[attr-defined]
+        p.precio_max = max(unitarios)  # type: ignore[attr-defined]
+        p.precio_prom = (sum(unitarios) / len(unitarios)).quantize(  # type: ignore[attr-defined]
+            Decimal("0.01")
+        )
+    else:
+        p.precio_ultimo = p.precio_min = p.precio_max = p.precio_prom = None  # type: ignore[attr-defined]
+
+    if not p.activo or efectiva is None:
         por_comprar = False
     elif ultima is None:
-        por_comprar = True  # definido pero sin comprar aún
+        por_comprar = True  # con cadencia definida pero sin comprar aún
     else:
-        por_comprar = (hoy - ultima).days >= p.cadencia_dias
+        por_comprar = (hoy - ultima).days >= efectiva
     p.por_comprar = por_comprar  # type: ignore[attr-defined]
     return p
 
@@ -78,15 +115,14 @@ def create_product(db: Session, data: ProductCreate) -> MarketProduct:
     db.add(p)
     db.commit()
     db.refresh(p)
-    return _enriquecer(p, None, date.today())
+    return _enriquecer(p, [], date.today())
 
 
 def get_product(db: Session, product_id: uuid.UUID) -> MarketProduct | None:
     p = db.get(MarketProduct, product_id)
     if p is None:
         return None
-    ultimas = _ultimas_compras(db)
-    return _enriquecer(p, ultimas.get(p.id), date.today())
+    return _enriquecer(p, _historial(db).get(p.id, []), date.today())
 
 
 def list_products(db: Session, solo_activos: bool = False) -> list[MarketProduct]:
@@ -94,9 +130,9 @@ def list_products(db: Session, solo_activos: bool = False) -> list[MarketProduct
     if solo_activos:
         stmt = stmt.where(MarketProduct.activo.is_(True))
     prods = list(db.execute(stmt.order_by(MarketProduct.nombre)).scalars().all())
-    ultimas = _ultimas_compras(db)
+    historial = _historial(db)
     hoy = date.today()
-    return [_enriquecer(p, ultimas.get(p.id), hoy) for p in prods]
+    return [_enriquecer(p, historial.get(p.id, []), hoy) for p in prods]
 
 
 def por_comprar(db: Session) -> list[MarketProduct]:
@@ -130,8 +166,7 @@ def update_product(
         setattr(p, campo, valor)
     db.commit()
     db.refresh(p)
-    ultimas = _ultimas_compras(db)
-    return _enriquecer(p, ultimas.get(p.id), date.today())
+    return _enriquecer(p, _historial(db).get(p.id, []), date.today())
 
 
 def delete_product(db: Session, product_id: uuid.UUID) -> bool:

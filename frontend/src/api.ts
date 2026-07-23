@@ -220,6 +220,12 @@ export interface MarketProduct {
   ultima_compra: string | null
   por_comprar: boolean
   dias_desde: number | null
+  ciclo_aprendido: number | null
+  cadencia_efectiva: number | null
+  precio_ultimo: string | null
+  precio_min: string | null
+  precio_max: string | null
+  precio_prom: string | null
 }
 export interface NuevoProducto {
   nombre: string

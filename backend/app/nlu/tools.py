@@ -968,7 +968,10 @@ def _que_toca_comprar(db: Session, a: dict) -> dict:
             {
                 "producto": p.nombre,
                 "dias_desde": p.dias_desde,  # type: ignore[attr-defined]
-                "cadencia_dias": p.cadencia_dias,
+                "cada_dias": p.cadencia_efectiva,  # type: ignore[attr-defined]
+                "ultimo_precio": (
+                    _money(p.precio_ultimo) if p.precio_ultimo else None  # type: ignore[attr-defined]
+                ),
             }
             for p in pend
         ],
@@ -982,9 +985,13 @@ def _listar_productos_mercado(db: Session, a: dict) -> dict:
         "productos": [
             {
                 "producto": p.nombre,
-                "cadencia_dias": p.cadencia_dias,
+                "cada_dias": p.cadencia_efectiva,  # type: ignore[attr-defined]
+                "ciclo_aprendido": p.ciclo_aprendido,  # type: ignore[attr-defined]
                 "ultima_compra": (
                     p.ultima_compra.isoformat() if p.ultima_compra else None  # type: ignore[attr-defined]
+                ),
+                "ultimo_precio": (
+                    _money(p.precio_ultimo) if p.precio_ultimo else None  # type: ignore[attr-defined]
                 ),
                 "por_comprar": p.por_comprar,  # type: ignore[attr-defined]
             }

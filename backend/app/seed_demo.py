@@ -203,24 +203,30 @@ def sembrar(db: Session) -> None:
             monto=Decimal(monto) if monto else None,
         ))
 
-    # --- Mercado: productos + algunas compras (para "por comprar") ---
+    # --- Mercado: productos con HISTORIAL de compras (Fase B: el ciclo se
+    # aprende de los intervalos y las stats de precio salen del historial).
+    # (nombre, cadencia_manual, [(días_atrás, precio_unitario), ...])
+    catalogo = [
+        # Sin cadencia manual: el ciclo se aprende (mediana de intervalos).
+        ("Leche", None, [(18, 5800), (13, 5900), (9, 6200), (5, 6200)]),      # ~4-5 días
+        ("Huevos", None, [(30, 18000), (22, 18500), (15, 19000), (8, 19500)]),  # ~7 días
+        ("Pan", None, [(13, 4500), (10, 4500), (7, 4800), (4, 4800)]),        # ~3 días
+        # Con cadencia manual (manda sobre la aprendida).
+        ("Café", 20, [(45, 28000), (24, 29500), (5, 31000)]),
+        ("Arroz", 30, [(70, 4200), (40, 4300), (10, 4500)]),
+        ("Papel higiénico", 21, [(25, 21900)]),  # ya toca
+    ]
     prods: dict[str, MarketProduct] = {}
-    for nombre, cadencia, ult in [
-        ("Leche", 4, 6),        # ya toca (pasó la cadencia)
-        ("Huevos", 7, 9),       # ya toca
-        ("Café", 20, 5),        # aún no
-        ("Pan", 3, 4),          # ya toca
-        ("Arroz", 30, 10),      # aún no
-        ("Papel higiénico", 21, 25),  # ya toca
-    ]:
+    for nombre, cadencia, compras in catalogo:
         p = MarketProduct(nombre=nombre, cadencia_dias=cadencia, category_id=cats["Mercado"].id)
         db.add(p)
         prods[nombre] = p
         db.flush()
-        db.add(MarketPurchase(
-            product_id=p.id, fecha=hoy - timedelta(days=ult),
-            cantidad=Decimal(1), precio=Decimal(0),
-        ))
+        for dias, precio in compras:
+            db.add(MarketPurchase(
+                product_id=p.id, fecha=hoy - timedelta(days=dias),
+                cantidad=Decimal(1), precio=Decimal(precio),
+            ))
 
 
 def resetear(db: Session) -> None:

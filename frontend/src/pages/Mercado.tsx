@@ -10,20 +10,33 @@ function hoyStr(): string {
 }
 
 function estado(p: MarketProduct): { texto: string; clase: string } {
-  if (!p.cadencia_dias) return { texto: 'sin ciclo', clase: 'pill-mute' }
+  if (!p.cadencia_efectiva) return { texto: 'sin ciclo', clase: 'pill-mute' }
   if (p.por_comprar) return { texto: 'por comprar', clase: 'pill-warn' }
   return { texto: 'al día', clase: 'pill-ok' }
 }
 
 function subtitulo(p: MarketProduct): string {
   const partes: string[] = []
-  if (p.cadencia_dias) partes.push(`cada ${p.cadencia_dias} días`)
+  if (p.cadencia_dias) {
+    partes.push(`cada ${p.cadencia_dias} días`)
+  } else if (p.ciclo_aprendido) {
+    partes.push(`cada ${p.ciclo_aprendido} días 🧠`)
+  }
   if (p.ultima_compra) {
     const d = p.dias_desde
     partes.push(d === 0 ? 'comprado hoy' : `último hace ${d} día${d === 1 ? '' : 's'}`)
   } else {
     partes.push('sin compras aún')
   }
+  return partes.join(' · ')
+}
+
+function lineaPrecios(p: MarketProduct): string | null {
+  if (!p.precio_ultimo) return null
+  const partes = [`último $${fmt(p.precio_ultimo)}`]
+  if (p.precio_prom) partes.push(`prom $${fmt(p.precio_prom)}`)
+  if (p.precio_min && p.precio_max && p.precio_min !== p.precio_max)
+    partes.push(`$${fmt(p.precio_min)}–$${fmt(p.precio_max)}`)
   return partes.join(' · ')
 }
 
@@ -79,7 +92,7 @@ export default function Mercado() {
         </p>
       </div>
 
-      <CompraEnCurso onCerrada={cargar} />
+      <CompraEnCurso onCerrada={cargar} productos={productos} />
 
       <NuevoProductoForm onCreado={cargar} />
 
@@ -133,6 +146,11 @@ export default function Mercado() {
                           <span className={`pill shrink-0 ${e.clase}`}>{e.texto}</span>
                         </div>
                         <div className="text-xs text-faint mt-0.5">{subtitulo(p)}</div>
+                        {lineaPrecios(p) && (
+                          <div className="text-xs text-muted mt-0.5">
+                            💰 {lineaPrecios(p)}
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button
@@ -222,9 +240,17 @@ function CompraModal({
               type="number"
               value={precio}
               onChange={(ev) => setPrecio(ev.target.value)}
-              placeholder="—"
+              placeholder={
+                producto.precio_ultimo ? `antes $${fmt(producto.precio_ultimo)}` : '—'
+              }
               className="input"
             />
+            {producto.precio_ultimo && (
+              <span className="text-faint">
+                la vez pasada: ${fmt(producto.precio_ultimo)}
+                {producto.precio_prom && ` · promedio $${fmt(producto.precio_prom)}`}
+              </span>
+            )}
           </label>
         </div>
         <label className="text-xs text-muted flex flex-col gap-1">
@@ -317,11 +343,29 @@ function EditorProducto({
               min={1}
               value={cadencia}
               onChange={(ev) => setCadencia(ev.target.value)}
-              placeholder="sin ciclo"
+              placeholder={
+                producto.ciclo_aprendido
+                  ? `aprendido: ${producto.ciclo_aprendido}`
+                  : 'sin ciclo'
+              }
               className="input"
             />
           </label>
         </div>
+        {producto.ciclo_aprendido && (
+          <p className="text-xs text-muted -mt-1">
+            🧠 Aprendido de tus compras: cada {producto.ciclo_aprendido} días.
+            {cadencia && (
+              <button
+                onClick={() => setCadencia('')}
+                className="ml-2 text-brand hover:underline"
+              >
+                Usar el aprendido
+              </button>
+            )}
+            {!cadencia && ' (vacío = se usa el aprendido)'}
+          </p>
+        )}
         <label className="text-xs text-muted flex flex-col gap-1">
           Notas
           <input
@@ -407,7 +451,13 @@ function fmt(v: string | number | null): string {
   return Number(v).toLocaleString('es-CO', { maximumFractionDigits: 0 })
 }
 
-function CompraEnCurso({ onCerrada }: { onCerrada: () => void }) {
+function CompraEnCurso({
+  onCerrada,
+  productos,
+}: {
+  onCerrada: () => void
+  productos: MarketProduct[]
+}) {
   const [trip, setTrip] = useState<Trip | null>(null)
   const [cargando, setCargando] = useState(true)
   const [nuevo, setNuevo] = useState('')
@@ -477,6 +527,7 @@ function CompraEnCurso({ onCerrada }: { onCerrada: () => void }) {
       {item && (
         <ItemModal
           item={item}
+          producto={productos.find((p) => p.id === item.product_id) ?? null}
           onCerrar={() => setItem(null)}
           onGuardado={() => {
             setItem(null)
@@ -583,10 +634,12 @@ function CompraEnCurso({ onCerrada }: { onCerrada: () => void }) {
 
 function ItemModal({
   item,
+  producto,
   onCerrar,
   onGuardado,
 }: {
   item: TripItem
+  producto: MarketProduct | null
   onCerrar: () => void
   onGuardado: () => void
 }) {
@@ -627,7 +680,21 @@ function ItemModal({
         </div>
         <label className="text-xs text-muted flex flex-col gap-1">
           Precio (opcional)
-          <input type="number" value={precio} onChange={(e) => setPrecio(e.target.value)} placeholder="—" className="input" />
+          <input
+            type="number"
+            value={precio}
+            onChange={(e) => setPrecio(e.target.value)}
+            placeholder={
+              producto?.precio_ultimo ? `antes $${fmt(producto.precio_ultimo)}` : '—'
+            }
+            className="input"
+          />
+          {producto?.precio_ultimo && (
+            <span className="text-faint">
+              la vez pasada: ${fmt(producto.precio_ultimo)}
+              {producto.precio_prom && ` · promedio $${fmt(producto.precio_prom)}`}
+            </span>
+          )}
         </label>
         <div className="flex justify-end gap-2 pt-1">
           <button onClick={onCerrar} className="btn-ghost btn">

@@ -41,6 +41,13 @@ class ProductOut(BaseModel):
     ultima_compra: date | None = None
     por_comprar: bool = False
     dias_desde: int | None = None
+    # Fase B — aprendidos del historial:
+    ciclo_aprendido: int | None = None  # mediana de días entre compras (≥2 intervalos)
+    cadencia_efectiva: int | None = None  # manual si existe; si no, la aprendida
+    precio_ultimo: Decimal | None = None  # precios UNITARIOS (precio ÷ cantidad)
+    precio_min: Decimal | None = None
+    precio_max: Decimal | None = None
+    precio_prom: Decimal | None = None
 
 
 class PurchaseCreate(BaseModel):
