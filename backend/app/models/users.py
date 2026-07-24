@@ -57,6 +57,27 @@ class User(ControlBase):
     )
 
 
+class WhatsappLink(ControlBase):
+    """Vínculo WhatsApp → usuario (multi-canal, igual que TelegramLink)."""
+
+    __tablename__ = "whatsapp_link"
+    __table_args__ = _SCHEMA
+
+    # wa_id: el número en formato internacional sin '+' (p. ej. '573001234567').
+    wa_id: Mapped[str] = mapped_column(String(20), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("public.app_user.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    activo: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
+    creado: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class TelegramLink(ControlBase):
     __tablename__ = "telegram_link"
     __table_args__ = _SCHEMA

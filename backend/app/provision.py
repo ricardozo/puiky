@@ -22,7 +22,7 @@ from sqlalchemy import text
 
 from app.auth.security import hash_password
 from app.database import SessionLocal, engine
-from app.models.users import TelegramLink, User
+from app.models.users import TelegramLink, User, WhatsappLink
 
 _ALEMBIC_INI = os.path.join(os.path.dirname(os.path.dirname(__file__)), "alembic.ini")
 _SLUG_RE = re.compile(r"^[a-z0-9_]{1,50}$")
@@ -107,6 +107,30 @@ def generar_codigo(usuario: str) -> str:
         user.enroll_expira = expira
         db.commit()
     return code
+
+
+def vincular_wa_por_codigo(wa_id: str, code: str) -> bool:
+    """Enlaza un WhatsApp a un usuario con el mismo código de un solo uso que
+    Telegram. Devuelve True si vinculó."""
+    with SessionLocal() as db:
+        db.execute(text("SET search_path TO public"))
+        user = db.query(User).filter_by(enroll_code=code).first()
+        if user is None or not user.activo:
+            return False
+        if user.enroll_expira is None or user.enroll_expira < datetime.now(
+            timezone.utc
+        ):
+            return False
+        link = db.get(WhatsappLink, wa_id)
+        if link is not None:
+            link.user_id = user.id
+            link.activo = True
+        else:
+            db.add(WhatsappLink(wa_id=wa_id, user_id=user.id))
+        user.enroll_code = None  # consumir
+        user.enroll_expira = None
+        db.commit()
+        return True
 
 
 def vincular_por_codigo(telegram_id: int, code: str) -> bool:

@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     # URL de la API de Puiky vista desde el contenedor del bot.
     puiky_api_url: str = "http://app:8000"
 
+    # WhatsApp Cloud API (canal opcional; vacío = deshabilitado)
+    wa_access_token: str = ""
+    wa_phone_number_id: str = ""
+    wa_verify_token: str = ""  # el que se configura en el webhook de Meta
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def allowed_ids(self) -> set[int]:

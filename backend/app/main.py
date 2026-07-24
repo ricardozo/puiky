@@ -17,6 +17,7 @@ from app.routers import (
     reminders,
     responsibilities,
     tasks,
+    whatsapp,
 )
 
 app = FastAPI(
@@ -42,6 +43,10 @@ def health() -> dict[str, str]:
 
 # Público: login. (/auth/me se protege por su propia dependencia.)
 app.include_router(auth.router)
+
+# Público: webhook de WhatsApp (Meta lo llama; se valida con su verify token y
+# los mensajes se atribuyen por wa_id → whatsapp_link).
+app.include_router(whatsapp.router)
 
 # Todos los dominios pasan por get_tenant_db: autentica (usuario web o token de
 # servicio + X-Tenant-User) y acota la sesión al schema del inquilino. Se monta
