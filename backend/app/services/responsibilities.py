@@ -88,10 +88,22 @@ def update_responsibility(
     return _enriquecer(db, resp)
 
 
-def _avanzar(resp: Responsibility) -> None:
+def _avanzar(db: Session, resp: Responsibility) -> None:
     """Recalcula el próximo vencimiento desde la fecha programada (no desde hoy):
-    el arriendo vence el mismo día cada mes, se pague antes o después."""
+    el arriendo vence el mismo día cada mes, se pague antes o después. Los avisos
+    pendientes de la fecha vieja se resuelven (el scheduler generará los nuevos)."""
     resp.proximo_venc = siguiente_vencimiento(resp.proximo_venc, resp.recurrencia)
+    from app.models.reminders import Reminder
+
+    db.execute(
+        Reminder.__table__.update()
+        .where(
+            Reminder.origen_tipo == "responsibility",
+            Reminder.origen_id == resp.id,
+            Reminder.resuelto.is_(False),
+        )
+        .values(resuelto=True)
+    )
 
 
 def fulfill_responsibility(
@@ -101,7 +113,7 @@ def fulfill_responsibility(
     resp = db.get(Responsibility, resp_id)
     if resp is None:
         return None
-    _avanzar(resp)
+    _avanzar(db, resp)
     db.commit()
     db.refresh(resp)
     return _enriquecer(db, resp)
@@ -135,7 +147,7 @@ def pay_responsibility(
             ),
         )
 
-    _avanzar(resp)
+    _avanzar(db, resp)
     db.commit()
     db.refresh(resp)
     return _enriquecer(db, resp), tx
@@ -145,6 +157,17 @@ def delete_responsibility(db: Session, resp_id: uuid.UUID) -> bool:
     resp = db.get(Responsibility, resp_id)
     if resp is None:
         return False
+    from app.models.reminders import Reminder
+
+    db.execute(
+        Reminder.__table__.update()
+        .where(
+            Reminder.origen_tipo == "responsibility",
+            Reminder.origen_id == resp_id,
+            Reminder.resuelto.is_(False),
+        )
+        .values(resuelto=True)
+    )
     db.delete(resp)
     db.commit()
     return True

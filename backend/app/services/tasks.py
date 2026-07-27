@@ -12,7 +12,7 @@ import uuid
 from datetime import date
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, object_session, selectinload
 
 from app.models.projects import Project
 from app.models.tasks import ChecklistItem, Task
@@ -38,6 +38,24 @@ def _reciclar(task: Task) -> None:
         item.hecho = False
 
 
+def _resolver_avisos(db: Session | None, task_id: uuid.UUID) -> None:
+    """Resuelve los avisos pendientes de la tarea: al completarla (o reciclarla,
+    que mueve la fecha límite) los de la fecha vieja quedarían sonando en falso."""
+    if db is None:
+        return
+    from app.models.reminders import Reminder
+
+    db.execute(
+        Reminder.__table__.update()
+        .where(
+            Reminder.origen_tipo == "task",
+            Reminder.origen_id == task_id,
+            Reminder.resuelto.is_(False),
+        )
+        .values(resuelto=True)
+    )
+
+
 def _completar(task: Task) -> None:
     """Completa una tarea: si es recurrente, la recicla; si no, la termina."""
     if task.recurrencia:
@@ -45,6 +63,7 @@ def _completar(task: Task) -> None:
     else:
         task.estado = TERMINADA
         task.avance_pct = 100
+    _resolver_avisos(object_session(task), task.id)
 
 
 def _validar_proyecto(db: Session, project_id: uuid.UUID | None) -> None:
@@ -203,6 +222,7 @@ def delete_task(db: Session, task_id: uuid.UUID) -> bool:
     task = db.get(Task, task_id)
     if task is None:
         return False
+    _resolver_avisos(db, task_id)
     db.delete(task)
     db.commit()
     return True
