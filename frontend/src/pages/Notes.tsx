@@ -321,13 +321,32 @@ function Detalle({
                 (esProyecto ? (
                   <span className="pill pill-active text-xs">Proyecto</span>
                 ) : (
-                  <button
-                    onClick={() => setEditandoNb(true)}
-                    className="text-faint hover:text-brand text-sm"
-                    title="Renombrar cuaderno"
-                  >
-                    ✎
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setEditandoNb(true)}
+                      className="text-faint hover:text-brand text-sm"
+                      title="Renombrar cuaderno"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (
+                          !window.confirm(
+                            'A eliminar este cuaderno sus hojas NO se borran: ' +
+                              'quedan en «Sin cuaderno». ¿Continuar?'
+                          )
+                        )
+                          return
+                        await api.deleteNotebook(sel.nb.id)
+                        onVolver()
+                      }}
+                      className="text-faint hover:text-[color:var(--c-danger)] text-sm"
+                      title="Eliminar cuaderno (las hojas quedan sin cuaderno)"
+                    >
+                      🗑
+                    </button>
+                  </>
                 ))}
             </div>
           )}
