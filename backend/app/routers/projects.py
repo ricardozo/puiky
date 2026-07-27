@@ -85,6 +85,16 @@ def editar_proyecto(
     return proyecto
 
 
+@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+def eliminar_proyecto(project_id: uuid.UUID, db: Session = Depends(get_db)) -> None:
+    """Elimina un proyecto vacío (sin tareas)."""
+    try:
+        if not service.delete_project(db, project_id):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Proyecto no encontrado")
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+
 @router.post("/{project_id}/archive", response_model=ProjectOut)
 def archivar_proyecto(
     project_id: uuid.UUID, db: Session = Depends(get_db)

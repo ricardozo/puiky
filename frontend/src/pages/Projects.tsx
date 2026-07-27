@@ -211,13 +211,29 @@ function Detalle({
           <div className="flex items-center gap-2">
             <h2 className="font-serif text-2xl">💼 {titulo}</h2>
             {sel.tipo === 'portafolio' && (
-              <button
-                onClick={() => setEditandoPf(true)}
-                className="text-faint hover:text-brand text-sm"
-                title="Renombrar portafolio"
-              >
-                ✎
-              </button>
+              <>
+                <button
+                  onClick={() => setEditandoPf(true)}
+                  className="text-faint hover:text-brand text-sm"
+                  title="Renombrar portafolio"
+                >
+                  ✎
+                </button>
+                {!cargando && projects.length === 0 && (
+                  <button
+                    onClick={async () => {
+                      if (!window.confirm(`¿Eliminar el portafolio «${titulo}»?`))
+                        return
+                      await api.deletePortfolio(sel.pf.id)
+                      onVolver()
+                    }}
+                    className="text-faint hover:text-[color:var(--c-danger)] text-sm"
+                    title="Eliminar portafolio (está vacío)"
+                  >
+                    🗑
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}

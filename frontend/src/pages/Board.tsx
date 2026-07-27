@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   DndContext,
   PointerSensor,
@@ -174,10 +174,20 @@ function ProjectHeader({
   project: ProjectDetail
   onCambio: () => void
 }) {
+  const navigate = useNavigate()
   const [nombre, setNombre] = useState(project.nombre)
   const [desc, setDesc] = useState(project.descripcion ?? '')
   const guardar = (patch: Parameters<typeof api.updateProject>[1]) =>
     api.updateProject(project.id, patch).then(onCambio)
+  const eliminar = async () => {
+    if (!window.confirm(`¿Eliminar el proyecto «${project.nombre}»?`)) return
+    try {
+      await api.deleteProject(project.id)
+      navigate('/proyectos')
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'No se pudo eliminar')
+    }
+  }
   const vencido =
     !!project.fecha_fin &&
     project.fecha_fin < hoyISO() &&
@@ -247,6 +257,14 @@ function ProjectHeader({
           ⏰ Venció el{' '}
           {new Date(project.fecha_fin + 'T00:00').toLocaleDateString('es-CO')}
         </p>
+      )}
+      {!project.es_personal && project.total_tareas === 0 && (
+        <button
+          onClick={eliminar}
+          className="text-faint hover:text-[color:var(--c-danger)] text-xs transition"
+        >
+          🗑 Eliminar proyecto (está vacío)
+        </button>
       )}
     </div>
   )

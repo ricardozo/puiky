@@ -165,6 +165,33 @@ def update_project(
     return _adjuntar_avance(project, total, term)
 
 
+def delete_project(db: Session, project_id: uuid.UUID) -> bool:
+    """Elimina un proyecto VACÍO (sin tareas). El Personal no se elimina; el
+    cuaderno homónimo se conserva (pasa a cuaderno normal, con sus notas)."""
+    project = db.get(Project, project_id)
+    if project is None:
+        return False
+    if project.es_personal:
+        raise ValueError("El proyecto Personal no se puede eliminar")
+    n_tareas = db.execute(
+        select(func.count(Task.id)).where(Task.project_id == project_id)
+    ).scalar()
+    if n_tareas:
+        raise ValueError(
+            f"El proyecto tiene {n_tareas} tarea(s); elimínalas o muévelas primero"
+        )
+    from app.models.notes import NoteLink
+
+    db.execute(
+        NoteLink.__table__.delete().where(
+            NoteLink.entidad_tipo == "project", NoteLink.entidad_id == project_id
+        )
+    )
+    db.delete(project)
+    db.commit()
+    return True
+
+
 def archive_project(db: Session, project_id: uuid.UUID) -> Project | None:
     """Archivar = pasar a estado terminado."""
     project = db.get(Project, project_id)

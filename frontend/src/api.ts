@@ -351,6 +351,8 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ portfolio_id: portfolioId }),
     }),
+  deleteProject: (id: string) =>
+    request<void>(`/projects/${id}`, { method: 'DELETE' }),
   updateProject: (
     id: string,
     data: {
