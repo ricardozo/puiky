@@ -1,10 +1,23 @@
 """Punto de entrada de la API de Puiky (FastAPI)."""
 
+from contextlib import asynccontextmanager
+
+from anyio import to_thread
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
+from app.embeddings import get_embedder
 from app.tenancy import get_tenant_db
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    # Precarga el modelo de embeddings al arrancar: si se carga perezoso, la
+    # primera nota del día paga ~30-60s de torch con la petición colgada y el
+    # usuario reintenta creyendo que no pasó nada (notas duplicadas).
+    await to_thread.run_sync(get_embedder)
+    yield
 from app.routers import (
     auth,
     finances,
@@ -24,6 +37,7 @@ app = FastAPI(
     title="Puiky API",
     description="Asistente personal — backend",
     version="0.1.0",
+    lifespan=_lifespan,
 )
 
 app.add_middleware(

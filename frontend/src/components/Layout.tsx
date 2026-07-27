@@ -1,8 +1,51 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { useTheme } from '../theme'
+
+function ToastErrores() {
+  // Red de seguridad: cualquier error de la API que ninguna pantalla capture
+  // (promesa rechazada sin catch) se muestra aquí en vez de perderse en
+  // silencio y dejar al usuario reintentando a ciegas.
+  const [msg, setMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>
+    const onRechazo = (e: PromiseRejectionEvent) => {
+      const r = e.reason
+      const texto =
+        r instanceof ApiError
+          ? r.message
+          : r instanceof TypeError
+            ? 'Sin conexión con el servidor. Revisa tu red e intenta de nuevo.'
+            : null
+      if (!texto) return
+      e.preventDefault()
+      setMsg(texto)
+      clearTimeout(timer)
+      timer = setTimeout(() => setMsg(null), 8000)
+    }
+    window.addEventListener('unhandledrejection', onRechazo)
+    return () => {
+      window.removeEventListener('unhandledrejection', onRechazo)
+      clearTimeout(timer)
+    }
+  }, [])
+
+  if (!msg) return null
+  return (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[70] max-w-md w-[calc(100%-2rem)]">
+      <div className="rounded-xl border border-[color:var(--c-danger)] bg-surface-2 px-4 py-3 text-sm shadow-lg flex items-start gap-2">
+        <span>⚠️</span>
+        <span className="flex-1">{msg}</span>
+        <button onClick={() => setMsg(null)} className="text-faint hover:text-ink">
+          ✕
+        </button>
+      </div>
+    </div>
+  )
+}
 
 function CambiarClave({ onCerrar }: { onCerrar: () => void }) {
   const [actual, setActual] = useState('')
@@ -217,6 +260,7 @@ export default function Layout() {
       </main>
 
       {clave && <CambiarClave onCerrar={() => setClave(false)} />}
+      <ToastErrores />
     </div>
   )
 }
