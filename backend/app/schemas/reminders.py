@@ -44,6 +44,15 @@ class ReminderCreate(BaseModel):
 class ReminderUpdate(BaseModel):
     texto: str | None = Field(default=None, min_length=1)
     disparar_en: datetime | None = None
+    # None explícito quita la recurrencia (pasa a ser de una sola vez).
+    recurrencia: str | None = Field(default=None, description=_AYUDA_REC)
+
+    @field_validator("recurrencia")
+    @classmethod
+    def _v_rec(cls, v: str | None) -> str | None:
+        if v is not None and not es_recurrencia_valida(v):
+            raise ValueError(f"Recurrencia inválida. Use: {_AYUDA_REC}")
+        return v
 
 
 class ReminderSnooze(BaseModel):

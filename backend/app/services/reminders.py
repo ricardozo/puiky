@@ -77,8 +77,13 @@ def update_reminder(
     reminder = db.get(Reminder, reminder_id)
     if reminder is None:
         return None
-    for campo, valor in data.model_dump(exclude_unset=True).items():
+    cambios = data.model_dump(exclude_unset=True)
+    for campo, valor in cambios.items():
         setattr(reminder, campo, valor)
+    if "disparar_en" in cambios:
+        # Fecha nueva: parte de cero (sin posposición ni avisos acumulados).
+        reminder.pospuesto_para = None
+        reminder.veces_avisado = 0
     db.commit()
     db.refresh(reminder)
     return reminder

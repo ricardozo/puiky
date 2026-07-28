@@ -579,6 +579,14 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ texto, disparar_en: dispararEn, recurrencia }),
     }),
+  updateReminder: (
+    id: string,
+    cambios: { texto?: string; disparar_en?: string; recurrencia?: string | null }
+  ) =>
+    request<Reminder>(`/reminders/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(cambios),
+    }),
   snoozeReminder: (id: string, pospuestoPara: string) =>
     request<Reminder>(`/reminders/${id}/snooze`, {
       method: 'POST',

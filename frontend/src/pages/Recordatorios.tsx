@@ -29,6 +29,123 @@ function colapsarPorOrigen(reminders: Reminder[]): Reminder[] {
   )
 }
 
+// ISO guardado -> valor de un input datetime-local, en hora local del navegador.
+function aLocalInput(iso: string): string {
+  const d = new Date(iso)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
+const RECURRENCIAS = [
+  ['', 'No se repite'],
+  ['diaria', 'Diario'],
+  ['semanal', 'Semanal'],
+  ['mensual', 'Mensual'],
+  ['trimestral', 'Trimestral'],
+  ['anual', 'Anual'],
+] as const
+
+function EditorRecordatorio({
+  reminder,
+  onCerrar,
+  onGuardado,
+}: {
+  reminder: Reminder
+  onCerrar: () => void
+  onGuardado: () => void
+}) {
+  const [texto, setTexto] = useState(reminder.texto)
+  const [cuando, setCuando] = useState(aLocalInput(efectivo(reminder)))
+  const [rec, setRec] = useState(reminder.recurrencia ?? '')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  // Si la recurrencia guardada no está en la lista (p. ej. cada_N_dias), se añade.
+  const opciones: [string, string][] =
+    rec && !RECURRENCIAS.some(([v]) => v === rec)
+      ? [[rec, rec], ...RECURRENCIAS.map(([v, l]) => [v, l] as [string, string])]
+      : RECURRENCIAS.map(([v, l]) => [v, l] as [string, string])
+
+  const guardar = async (e: FormEvent) => {
+    e.preventDefault()
+    setError('')
+    if (!texto.trim() || !cuando) return
+    setBusy(true)
+    try {
+      await api.updateReminder(reminder.id, {
+        texto: texto.trim(),
+        disparar_en: aISOColombia(cuando),
+        recurrencia: rec || null,
+      })
+      onGuardado()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo guardar')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4"
+      onClick={onCerrar}
+    >
+      <div
+        className="card w-full max-w-md p-6 space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="font-serif text-xl">Editar recordatorio</h3>
+        <form onSubmit={guardar} className="space-y-3">
+          <label className="text-xs text-muted flex flex-col gap-1">
+            Texto
+            <input
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              autoFocus
+              className="input"
+            />
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-xs text-muted flex flex-col gap-1">
+              Cuándo
+              <input
+                type="datetime-local"
+                value={cuando}
+                min="2000-01-01T00:00"
+                max="9999-12-31T23:59"
+                onChange={(e) => setCuando(e.target.value)}
+                className="input"
+              />
+            </label>
+            <label className="text-xs text-muted flex flex-col gap-1">
+              Repetición
+              <select
+                value={rec}
+                onChange={(e) => setRec(e.target.value)}
+                className="input"
+              >
+                {opciones.map(([v, l]) => (
+                  <option key={v} value={v}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {error && <p className="text-[color:var(--c-danger)] text-sm">{error}</p>}
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={onCerrar} className="btn-ghost btn">
+              Cancelar
+            </button>
+            <button disabled={busy} className="btn">
+              {busy ? 'Guardando…' : 'Guardar'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 function mananaNueve(): string {
   const d = new Date()
   d.setDate(d.getDate() + 1)
@@ -47,6 +164,7 @@ export default function Recordatorios() {
   const [recurrencia, setRecurrencia] = useState('')
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(true)
+  const [editando, setEditando] = useState<Reminder | null>(null)
   const navigate = useNavigate()
 
   // Trae todos los no resueltos (o los resueltos, con el check); el filtrado de
@@ -243,6 +361,15 @@ export default function Recordatorios() {
                 </div>
                 {!r.resuelto && (
                   <div className="flex items-center gap-2 shrink-0 text-sm">
+                    {!r.origen_tipo && (
+                      <button
+                        onClick={() => setEditando(r)}
+                        title="Editar recordatorio"
+                        className="opacity-0 group-hover:opacity-100 text-faint hover:text-brand transition"
+                      >
+                        ✎
+                      </button>
+                    )}
                     <button
                       onClick={async () => {
                         await api.snoozeReminder(r.id, mananaNueve())
@@ -303,20 +430,40 @@ export default function Recordatorios() {
                     {new Date(efectivo(r)).toLocaleString('es-CO')}
                   </p>
                 </div>
-                <button
-                  onClick={async () => {
-                    if (!window.confirm('¿Eliminar este recordatorio?')) return
-                    await api.deleteReminder(r.id)
-                    cargar()
-                  }}
-                  className="opacity-0 group-hover:opacity-100 text-faint hover:text-[color:var(--c-danger)] transition shrink-0"
-                >
-                  ✕
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => setEditando(r)}
+                    title="Editar recordatorio"
+                    className="opacity-0 group-hover:opacity-100 text-faint hover:text-brand transition"
+                  >
+                    ✎
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!window.confirm('¿Eliminar este recordatorio?')) return
+                      await api.deleteReminder(r.id)
+                      cargar()
+                    }}
+                    className="opacity-0 group-hover:opacity-100 text-faint hover:text-[color:var(--c-danger)] transition"
+                  >
+                    ✕
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
         </div>
+      )}
+
+      {editando && (
+        <EditorRecordatorio
+          reminder={editando}
+          onCerrar={() => setEditando(null)}
+          onGuardado={() => {
+            setEditando(null)
+            cargar()
+          }}
+        />
       )}
     </div>
   )
