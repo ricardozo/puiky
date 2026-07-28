@@ -8,16 +8,20 @@ import {
   type Responsibility,
 } from '../api'
 
-const RECURRENCIAS = ['diaria', 'semanal', 'mensual', 'trimestral', 'anual']
+const RECURRENCIAS = ['unica', 'diaria', 'semanal', 'mensual', 'trimestral', 'anual']
 
 // Factor para convertir cada recurrencia a su costo mensual equivalente.
+// «unica» no entra al resumen: es un pago de una sola vez, no un costo mensual.
 const FACTOR_MENSUAL: Record<string, number> = {
+  unica: 0,
   diaria: 365 / 12,
   semanal: 52 / 12,
   mensual: 1,
   trimestral: 1 / 3,
   anual: 1 / 12,
 }
+const labelRec = (r: string) => (r === 'unica' ? 'única (un solo pago)' : r)
+
 function factorMensual(recurrencia: string): number {
   if (recurrencia in FACTOR_MENSUAL) return FACTOR_MENSUAL[recurrencia]
   const m = /^cada_(\d+)_dias$/.exec(recurrencia)
@@ -129,8 +133,10 @@ export default function Responsabilidades() {
 
       <h2 className="font-serif text-2xl">Responsabilidades</h2>
       <p className="text-sm text-muted">
-        Compromisos que se repiten (arriendo, administración, renovaciones). Si les
-        pones cuenta y monto, al registrar el pago se crea el gasto en finanzas.
+        Compromisos de pago: los que se repiten (arriendo, administración) y los de
+        una sola vez (una deuda, con recurrencia «única»: al pagarla desaparece).
+        Si les pones cuenta y monto, al registrar el pago se crea el gasto en
+        finanzas.
       </p>
 
       <form onSubmit={crear} className="flex flex-wrap gap-2">
@@ -147,7 +153,7 @@ export default function Responsabilidades() {
         >
           {RECURRENCIAS.map((r) => (
             <option key={r} value={r}>
-              {r}
+              {labelRec(r)}
             </option>
           ))}
         </select>
@@ -236,7 +242,8 @@ export default function Responsabilidades() {
               <div className="min-w-0">
                 <p className="font-medium">{r.nombre}</p>
                 <p className="text-xs text-muted mt-1">
-                  {r.recurrencia} · próximo:{' '}
+                  {labelRec(r.recurrencia)} ·{' '}
+                  {r.recurrencia === 'unica' ? 'vence:' : 'próximo:'}{' '}
                   {new Date(r.proximo_venc + 'T00:00').toLocaleDateString('es-CO')}
                   {r.monto && ` · $${fmtMoney(r.monto)}`}
                   {r.cuenta && ` · ${r.cuenta}`}
@@ -442,7 +449,7 @@ function EditorResponsabilidad({
             >
               {opciones.map((r) => (
                 <option key={r} value={r}>
-                  {r}
+                  {labelRec(r)}
                 </option>
               ))}
             </select>

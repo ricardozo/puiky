@@ -1422,8 +1422,9 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         "crear_responsabilidad",
-        "Crea un compromiso recurrente (arriendo, administración, renovación). "
-        "recurrencia: diaria|semanal|mensual|trimestral|anual|cada_N_dias. "
+        "Crea un compromiso de pago (arriendo, administración, una deuda). "
+        "recurrencia: unica|diaria|semanal|mensual|trimestral|anual|cada_N_dias "
+        "(unica = deuda de un solo pago; al pagarla desaparece). "
         "proximo_venc en YYYY-MM-DD. Opcional: monto, y cuenta/categoria para que "
         "al pagarlo se registre el gasto en finanzas.",
         _p(

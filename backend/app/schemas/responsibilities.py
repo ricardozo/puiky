@@ -8,7 +8,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.services.recurrence import es_recurrencia_valida
 
-_AYUDA_REC = "diaria | semanal | mensual | trimestral | anual | cada_<N>_dias"
+_AYUDA_REC = (
+    "unica | diaria | semanal | mensual | trimestral | anual | cada_<N>_dias"
+)
+
+
+def _rec_valida(v: str) -> bool:
+    # «unica»: compromiso de un solo pago; al cumplirse desaparece.
+    return v == "unica" or es_recurrencia_valida(v)
 
 
 class ResponsibilityCreate(BaseModel):
@@ -22,7 +29,7 @@ class ResponsibilityCreate(BaseModel):
     @field_validator("recurrencia")
     @classmethod
     def _validar_recurrencia(cls, v: str) -> str:
-        if not es_recurrencia_valida(v):
+        if not _rec_valida(v):
             raise ValueError(f"Recurrencia inválida. Use: {_AYUDA_REC}")
         return v
 
@@ -38,7 +45,7 @@ class ResponsibilityUpdate(BaseModel):
     @field_validator("recurrencia")
     @classmethod
     def _validar_recurrencia(cls, v: str | None) -> str | None:
-        if v is not None and not es_recurrencia_valida(v):
+        if v is not None and not _rec_valida(v):
             raise ValueError(f"Recurrencia inválida. Use: {_AYUDA_REC}")
         return v
 
