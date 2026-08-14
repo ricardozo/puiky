@@ -74,8 +74,9 @@ class TransactionCreate(BaseModel):
 
 class TransactionUpdate(BaseModel):
     """Edición de un movimiento. Solo los campos enviados se modifican; el
-    servicio revierte el efecto viejo y aplica el nuevo. `tipo` solo admite
-    cambiar entre gasto e ingreso (una transferencia no cambia de forma)."""
+    servicio revierte el efecto viejo y aplica el nuevo. `tipo` admite
+    cualquier cambio; al convertir a transferencia envíe `cuenta_destino_id`
+    y `category_id: null` (y al revés, destino null y una categoría)."""
 
     tipo: TransactionTipo | None = None
     monto: Decimal | None = Field(default=None, gt=0)

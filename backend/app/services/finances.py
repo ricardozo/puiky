@@ -171,9 +171,12 @@ def get_transaction(db: Session, tx_id: uuid.UUID) -> Transaction | None:
 
 
 def update_transaction(db: Session, tx_id: uuid.UUID, data) -> Transaction | None:
-    """Edita un movimiento sin cambiar su tipo. Solo se tocan los campos
-    enviados; el saldo se mantiene coherente: se revierte el efecto anterior
-    y se aplica el nuevo. Errores de validación via ValueError (-> 400)."""
+    """Edita un movimiento, incluido su tipo (p. ej. un gasto que en realidad
+    era una transferencia). Solo se tocan los campos enviados; el saldo se
+    mantiene coherente: se revierte el efecto anterior (con el tipo viejo) y se
+    aplica el nuevo. La combinación resultante se valida completa según el tipo
+    final (transferencia: destino sí, categoría no; gasto/ingreso: al revés).
+    Errores de validación via ValueError (-> 400)."""
     tx = db.get(Transaction, tx_id)
     if tx is None:
         return None
@@ -182,12 +185,6 @@ def update_transaction(db: Session, tx_id: uuid.UUID, data) -> Transaction | Non
     tipo_viejo = tx.tipo
     tipo = cambios.get("tipo")
     tipo = tipo.value if tipo is not None else tipo_viejo
-    if tipo != tipo_viejo and TRANSFERENCIA in (tipo, tipo_viejo):
-        # gasto↔ingreso se permite (corregir un registro al revés); una
-        # transferencia cambia de forma (destino) y no se convierte.
-        raise ValueError(
-            "Solo se puede cambiar el tipo entre gasto e ingreso"
-        )
 
     nuevo_monto = cambios.get("monto", tx.monto)
     nueva_cuenta = cambios.get("account_id", tx.account_id)

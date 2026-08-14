@@ -51,7 +51,6 @@ function EditorMovimiento({
   onCerrar: () => void
   onGuardado: () => void
 }) {
-  const esTransfer = tx.tipo === 'transferencia'
   const [tipo, setTipo] = useState(tx.tipo)
   const [monto, setMonto] = useState(String(tx.monto))
   const [cuenta, setCuenta] = useState(tx.account_id)
@@ -62,12 +61,22 @@ function EditorMovimiento({
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
+  const esTransfer = tipo === 'transferencia'
+
   const guardar = async () => {
-    setBusy(true)
     setError('')
+    if (esTransfer && !destino) {
+      setError('Elige la cuenta de destino de la transferencia.')
+      return
+    }
+    if (esTransfer && destino === cuenta) {
+      setError('La cuenta de destino debe ser distinta de la de origen.')
+      return
+    }
+    setBusy(true)
     try {
       await api.updateTransaction(tx.id, {
-        tipo: esTransfer ? undefined : tipo,
+        tipo,
         monto: Number(monto),
         account_id: cuenta,
         cuenta_destino_id: esTransfer ? destino : null,
@@ -94,19 +103,16 @@ function EditorMovimiento({
       >
         <div className="flex items-center justify-between">
           <h3 className="font-serif text-xl">Editar movimiento</h3>
-          {esTransfer ? (
-            <span className="badge">{tx.tipo}</span>
-          ) : (
-            <select
-              value={tipo}
-              onChange={(e) => setTipo(e.target.value)}
-              className="input w-auto py-1 text-sm"
-              title="Cambiar entre gasto e ingreso (corrige el saldo solo)"
-            >
-              <option value="gasto">gasto</option>
-              <option value="ingreso">ingreso</option>
-            </select>
-          )}
+          <select
+            value={tipo}
+            onChange={(e) => setTipo(e.target.value)}
+            className="input w-auto py-1 text-sm"
+            title="Cambiar el tipo (los saldos se corrigen solos)"
+          >
+            <option value="gasto">gasto</option>
+            <option value="ingreso">ingreso</option>
+            <option value="transferencia">transferencia</option>
+          </select>
         </div>
 
         <label className="text-xs text-muted flex flex-col gap-1">
