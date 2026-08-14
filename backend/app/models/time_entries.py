@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import UUID, DateTime, ForeignKey, Index, String, text
+from sqlalchemy import UUID, Boolean, DateTime, ForeignKey, Index, Integer, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -35,3 +35,9 @@ class TimeEntry(Base):
         DateTime(timezone=True), nullable=True
     )
     nota: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # Pomodoro: a los cuántos minutos avisar por Telegram (NULL = sin aviso),
+    # y si el aviso de esta sesión ya se envió.
+    aviso_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    avisado: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )

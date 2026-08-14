@@ -113,7 +113,9 @@ export default function Tiempo() {
   const iniciar = async (taskId: string) => {
     setError('')
     try {
-      await api.timeStart(taskId)
+      // El pomodoro viaja con la sesión: el scheduler avisa por Telegram al
+      // cumplirse, aunque cierres esta pestaña.
+      await api.timeStart(taskId, pomoMin)
       avisado.current = false
       cargar()
     } catch (e) {

@@ -354,10 +354,10 @@ export const api = {
   listRecurringTasks: () => request<Task[]>('/tasks/recurrentes'),
 
   // Registro de tiempo
-  timeStart: (taskId: string) =>
+  timeStart: (taskId: string, avisoMin?: number) =>
     request<TimeEntry>('/time/start', {
       method: 'POST',
-      body: JSON.stringify({ task_id: taskId }),
+      body: JSON.stringify({ task_id: taskId, aviso_min: avisoMin ?? null }),
     }),
   timeStop: () => request<TimeEntry>('/time/stop', { method: 'POST' }),
   timeCurrent: () => request<TimeEntry | null>('/time/actual'),

@@ -9,6 +9,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 class TimeEntryStart(BaseModel):
     task_id: uuid.UUID
     nota: str | None = Field(default=None, max_length=300)
+    # Pomodoro pactado para ESTA sesión; el scheduler avisa por Telegram al
+    # cumplirse. None = sin aviso.
+    aviso_min: int | None = Field(default=None, ge=5, le=240)
 
 
 class TimeEntryUpdate(BaseModel):

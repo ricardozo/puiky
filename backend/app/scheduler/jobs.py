@@ -209,6 +209,48 @@ def generar_alertas_mercado(db: Session, ahora: datetime) -> int:
     return creados
 
 
+async def avisar_pomodoros(
+    db: Session,
+    notifier: Notifier,
+    chat_ids: set[int],
+    ahora: datetime,
+) -> int:
+    """Telegram al cumplirse el pomodoro de la sesión de tiempo corriendo.
+
+    Una sola vez por sesión (avisado). NO respeta el horario de silencio: el
+    pomodoro lo pidió el usuario hace minutos, está despierto trabajando."""
+    from app.models.tasks import Task
+    from app.models.time_entries import TimeEntry
+
+    if not chat_ids:
+        return 0
+    corriendo = db.execute(
+        select(TimeEntry).where(
+            TimeEntry.fin.is_(None),
+            TimeEntry.avisado.is_(False),
+            TimeEntry.aviso_min.is_not(None),
+        )
+    ).scalars().all()
+
+    enviados = 0
+    for e in corriendo:
+        if e.inicio + timedelta(minutes=e.aviso_min) > ahora:
+            continue
+        task = db.get(Task, e.task_id)
+        titulo = task.titulo if task else "tu tarea"
+        texto = (
+            f"🍅 ¡Pomodoro cumplido! «{titulo}» — {e.aviso_min} min. "
+            "Buen momento para una pausa (o sigue, tú mandas)."
+        )
+        for chat_id in chat_ids:
+            await notifier.send(chat_id, texto)
+        e.avisado = True
+        enviados += 1
+    if enviados:
+        db.commit()
+    return enviados
+
+
 def en_silencio(hora: int, desde: int, hasta: int) -> bool:
     """¿La hora cae en el horario de silencio? Soporta rangos que cruzan la
     medianoche (p. ej. 21→7) y rangos diurnos (p. ej. 13→15)."""

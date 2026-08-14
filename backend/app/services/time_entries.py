@@ -44,7 +44,9 @@ def start_entry(db: Session, data: TimeEntryStart) -> TimeEntry:
         .where(TimeEntry.fin.is_(None))
         .values(fin=ahora)
     )
-    entry = TimeEntry(task_id=data.task_id, inicio=ahora, nota=data.nota)
+    entry = TimeEntry(
+        task_id=data.task_id, inicio=ahora, nota=data.nota, aviso_min=data.aviso_min
+    )
     db.add(entry)
     db.commit()
     db.refresh(entry)
