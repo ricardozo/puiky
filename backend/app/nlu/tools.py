@@ -407,6 +407,74 @@ def _listar_tareas_pendientes(db: Session, a: dict) -> dict:
     }
 
 
+# --- Registro de tiempo (cronometrar ≠ completar) ---
+
+
+def _iniciar_tiempo(db: Session, a: dict) -> dict:
+    from app.schemas.time_entries import TimeEntryStart
+    from app.services import time_entries as time_svc
+
+    tarea = _resolver_tarea(db, a["tarea"])
+    # Sin minutos explícitos: pomodoro estándar de 45 (el aviso llega igual).
+    aviso = a.get("pomodoro_min") or 45
+    e = time_svc.start_entry(
+        db, TimeEntryStart(task_id=tarea.id, aviso_min=int(aviso))
+    )
+    return {
+        "ok": True,
+        "tarea": e.tarea,
+        "proyecto": e.proyecto,
+        "inicio": e.inicio.isoformat(),
+        "pomodoro_min": e.aviso_min,
+    }
+
+
+def _parar_tiempo(db: Session, a: dict) -> dict:
+    from app.services import time_entries as time_svc
+
+    e = time_svc.stop_entry(db)
+    if e is None:
+        return {"ok": False, "error": "No hay ninguna sesión de tiempo corriendo."}
+    minutos = round((e.fin - e.inicio).total_seconds() / 60)
+    return {"ok": True, "tarea": e.tarea, "minutos": minutos}
+
+
+def _tiempo_actual(db: Session, a: dict) -> dict:
+    from app.services import time_entries as time_svc
+    from app.timeutils import now_local
+
+    e = time_svc.current_entry(db)
+    if e is None:
+        return {"ok": True, "corriendo": False}
+    minutos = round((now_local() - e.inicio).total_seconds() / 60)
+    return {
+        "ok": True,
+        "corriendo": True,
+        "tarea": e.tarea,
+        "proyecto": e.proyecto,
+        "minutos": minutos,
+        "pomodoro_min": e.aviso_min,
+    }
+
+
+def _tiempo_de_hoy(db: Session, a: dict) -> dict:
+    from app.services import time_entries as time_svc
+    from app.timeutils import now_local
+
+    ahora = now_local()
+    por_tarea: dict[str, int] = {}
+    for e in time_svc.list_entries(db):
+        fin = e.fin or ahora
+        minutos = round((fin - e.inicio).total_seconds() / 60)
+        etiqueta = e.tarea or "(tarea eliminada)"
+        por_tarea[etiqueta] = por_tarea.get(etiqueta, 0) + minutos
+    return {
+        "ok": True,
+        "total_min": sum(por_tarea.values()),
+        "por_tarea": por_tarea,
+    }
+
+
 def _resumen_tarea(t: Task) -> dict:
     d = {
         "titulo": t.titulo,
@@ -1249,6 +1317,34 @@ TOOLS: list[Tool] = [
         "Lista las tareas que no están terminadas.",
         _p({}, []),
         _listar_tareas_pendientes,
+    ),
+    Tool(
+        "iniciar_tiempo",
+        "Arranca el cronómetro/pomodoro sobre una tarea (referida por su "
+        "título). SOLO registra tiempo, NO completa la tarea. Cierra sola la "
+        "sesión anterior. pomodoro_min SOLO si el usuario dice los minutos; "
+        "si no los dice, omítelo (el sistema pone su estándar).",
+        _p({"tarea": _STR, "pomodoro_min": _NUM}, ["tarea"]),
+        _iniciar_tiempo,
+    ),
+    Tool(
+        "parar_tiempo",
+        "Para el cronómetro de la sesión de tiempo corriendo. NO completa la "
+        "tarea, solo deja de contar tiempo.",
+        _p({}, []),
+        _parar_tiempo,
+    ),
+    Tool(
+        "tiempo_actual",
+        "Dice en qué tarea está corriendo el cronómetro y hace cuántos minutos.",
+        _p({}, []),
+        _tiempo_actual,
+    ),
+    Tool(
+        "tiempo_de_hoy",
+        "Resumen del tiempo registrado hoy: total y minutos por tarea.",
+        _p({}, []),
+        _tiempo_de_hoy,
     ),
     Tool(
         "editar_tarea",

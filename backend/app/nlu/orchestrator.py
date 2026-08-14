@@ -103,8 +103,25 @@ def _corregir_tool_calls(texto: str, calls: list[ToolCall]) -> list[ToolCall]:
             out.append(ToolCall(name="crear_recordatorio", arguments=args))
         else:
             _corregir_magnitud(texto, tc)
+            _corregir_pomodoro(texto, tc)
             out.append(tc)
     return out
+
+
+def _corregir_pomodoro(texto: str, tc: ToolCall) -> None:
+    """Qwen inventa «pomodoro_min: 25» (el pomodoro clásico de su cultura
+    general) aunque el usuario no dijo minutos. Si el número no aparece en el
+    texto, se quita y manda el estándar del sistema (45)."""
+    if tc.name != "iniciar_tiempo":
+        return
+    minutos = tc.arguments.get("pomodoro_min")
+    if minutos is None:
+        return
+    try:
+        if str(int(minutos)) not in texto:
+            del tc.arguments["pomodoro_min"]
+    except (TypeError, ValueError):
+        del tc.arguments["pomodoro_min"]
 
 
 def _tool_calls_desde_texto(content: str | None) -> list[ToolCall]:
@@ -230,6 +247,13 @@ def _system_prompt(db: Session) -> str:
         "marcar_comprado. «¿qué me falta?» → que_me_falta. «terminé / cierra la "
         "compra [con tal cuenta]» → cerrar_compra. «cancela / me arrepentí» → "
         "cancelar_compra.\n"
+        "- REGLA DE TIEMPO (cronometrar ≠ completar): «empieza/arranca [pomodoro/"
+        "tiempo] en X», «voy a trabajar en X», «ponme en X» → iniciar_tiempo "
+        "(solo cuenta tiempo). «paré», «pausa», «ya no más», «terminé el "
+        "pomodoro» → parar_tiempo. «¿en qué voy/estoy?» → tiempo_actual. "
+        "«¿cuánto tiempo llevo hoy?» → tiempo_de_hoy. Solo usa completar_tarea "
+        "si dicen que la tarea QUEDÓ LISTA («terminé la tarea», «ya quedó», "
+        "«completa X»); parar el reloj nunca completa la tarea.\n"
         "- Pide un dato solo si de verdad falta; no preguntes por algo ya dicho.\n"
         "- Puedes ejecutar varias acciones si el usuario menciona varias.\n"
         "- Responde en español, breve y natural, confirmando lo hecho."
