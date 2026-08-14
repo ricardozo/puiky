@@ -22,6 +22,16 @@ class Transcriber(Protocol):
     def transcribe(self, audio: bytes) -> str: ...
 
 
+# Sesga la decodificación hacia el vocabulario real del asistente (platas
+# colombianas, cuentas, mercado); mejora mucho los "30 mil" y nombres propios.
+_PROMPT_DOMINIO = (
+    "Nota de voz en español de Colombia para un asistente personal de gastos, "
+    "mercado, tareas y recordatorios. Ejemplos: gasté 35 mil en almuerzo con "
+    "Bancolombia; transfiere 200 mil a ahorro; recuérdame pagar el arriendo el "
+    "viernes; agua en botella 2 por 5 mil cada una."
+)
+
+
 class RealTranscriber:
     def __init__(self, model_size: str) -> None:
         from faster_whisper import WhisperModel  # import perezoso
@@ -30,7 +40,16 @@ class RealTranscriber:
         self._model = WhisperModel(model_size, device="cpu", compute_type="int8")
 
     def transcribe(self, audio: bytes) -> str:
-        segments, _ = self._model.transcribe(io.BytesIO(audio), language="es")
+        segments, _ = self._model.transcribe(
+            io.BytesIO(audio),
+            language="es",
+            initial_prompt=_PROMPT_DOMINIO,
+            # Recorta silencios/ruido antes de decodificar.
+            vad_filter=True,
+            # Cada nota de voz es corta e independiente: sin arrastre entre
+            # segmentos, que en audios cortos produce alucinaciones repetidas.
+            condition_on_previous_text=False,
+        )
         return "".join(seg.text for seg in segments).strip()
 
 
