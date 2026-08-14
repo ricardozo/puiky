@@ -334,11 +334,22 @@ export default function Recordatorios() {
       ) : (
         <ul className="space-y-2">
           {visibles.map((r) => {
-            const venc = new Date(efectivo(r)).getTime() <= ahora && !r.resuelto
+            const cuando = new Date(efectivo(r))
+            const hoy0 = new Date()
+            hoy0.setHours(0, 0, 0, 0)
+            // «Vencido» de verdad: quedó de días anteriores. Lo de hoy es
+            // simplemente lo que toca hoy.
+            const vencido = !r.resuelto && cuando.getTime() < hoy0.getTime()
+            const esHoy = !r.resuelto && !vencido && cuando.getTime() <= ahora
             return (
               <li
                 key={r.id}
                 className="group card px-4 py-3 flex items-start justify-between gap-3"
+                style={
+                  vencido
+                    ? { borderColor: 'color-mix(in srgb, var(--c-danger) 45%, var(--c-line))' }
+                    : undefined
+                }
               >
                 <div>
                   <p className={r.resuelto ? 'line-through text-faint' : ''}>
@@ -348,10 +359,25 @@ export default function Recordatorios() {
                     )}
                   </p>
                   <p className="text-xs mt-1">
-                    <span className={venc ? 'text-[color:var(--c-danger)]' : 'text-faint'}>
-                      {venc ? '⏰ vencido · ' : ''}
-                      {new Date(efectivo(r)).toLocaleString('es-CO')}
-                    </span>
+                    {vencido ? (
+                      <span className="text-[color:var(--c-danger)] font-medium">
+                        ⏰ vencido · {cuando.toLocaleString('es-CO')}
+                      </span>
+                    ) : esHoy ? (
+                      <>
+                        <span className="pill pill-warn">hoy</span>{' '}
+                        <span className="text-faint">
+                          {cuando.toLocaleTimeString('es-CO', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-faint">
+                        {cuando.toLocaleString('es-CO')}
+                      </span>
+                    )}
                     {r.veces_avisado > 0 && (
                       <span className="text-faint ml-2">
                         · avisado {r.veces_avisado}×
@@ -385,7 +411,11 @@ export default function Recordatorios() {
                         cargar()
                       }}
                       className="btn text-sm py-1"
-                      style={{ background: 'var(--c-green)', color: '#fff' }}
+                      style={{
+                        background: vencido ? 'var(--c-danger)' : 'var(--c-green)',
+                        color: '#fff',
+                      }}
+                      title={vencido ? 'Quedó de días anteriores' : undefined}
                     >
                       Resolver
                     </button>
