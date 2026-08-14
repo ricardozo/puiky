@@ -446,6 +446,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ nombre, tipo, saldo_inicial: saldoInicial }),
     }),
+  // Solo cuentas en cero. Sin movimientos se borra; con movimientos se archiva.
+  deleteAccount: (id: string) =>
+    request<{ resultado: 'eliminada' | 'archivada' }>(`/accounts/${id}`, {
+      method: 'DELETE',
+    }),
   listCategories: (soloActivas = true) =>
     request<Category[]>(`/categories?solo_activas=${soloActivas}`),
   createCategory: (nombre: string) =>

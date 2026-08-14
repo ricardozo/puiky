@@ -70,6 +70,21 @@ def editar_cuenta(
     return cuenta
 
 
+@accounts_router.delete("/{account_id}")
+def eliminar_cuenta(
+    account_id: uuid.UUID, db: Session = Depends(get_db)
+) -> dict[str, str]:
+    """Elimina una cuenta en cero: sin movimientos se borra; con movimientos se
+    archiva (deja de listarse, el histórico queda). Devuelve cuál de las dos."""
+    try:
+        resultado = service.delete_account(db, account_id)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    if resultado is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Cuenta no encontrada")
+    return {"resultado": resultado}
+
+
 # --- Categorías ---
 
 

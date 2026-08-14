@@ -51,7 +51,9 @@ def get_account(db: Session, account_id: uuid.UUID) -> Account | None:
 
 
 def list_accounts(db: Session) -> list[Account]:
-    return list(db.execute(select(Account).order_by(Account.nombre)).scalars().all())
+    """Solo las activas: las archivadas conservan el histórico pero no se ven."""
+    stmt = select(Account).where(Account.activa.is_(True)).order_by(Account.nombre)
+    return list(db.execute(stmt).scalars().all())
 
 
 def update_account(
@@ -65,6 +67,33 @@ def update_account(
     db.commit()
     db.refresh(account)
     return account
+
+
+def delete_account(db: Session, account_id: uuid.UUID) -> str | None:
+    """Elimina una cuenta en cero. Sin movimientos se borra de verdad
+    («eliminada»); con movimientos se archiva («archivada») para no romper el
+    histórico. Con saldo distinto de cero: ValueError."""
+    account = db.get(Account, account_id)
+    if account is None:
+        return None
+    if account.saldo != 0:
+        raise ValueError(
+            f"La cuenta tiene saldo ${account.saldo:,.0f}; déjala en cero antes "
+            "de eliminarla (con un ajuste o una transferencia)"
+        )
+    movimientos = db.execute(
+        select(func.count(Transaction.id)).where(
+            (Transaction.account_id == account_id)
+            | (Transaction.cuenta_destino_id == account_id)
+        )
+    ).scalar()
+    if movimientos:
+        account.activa = False
+        db.commit()
+        return "archivada"
+    db.delete(account)
+    db.commit()
+    return "eliminada"
 
 
 # --- Categorías ---

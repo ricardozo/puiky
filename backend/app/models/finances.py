@@ -11,7 +11,10 @@ from app.models.base import Base
 
 
 class Account(Base):
-    """Cuenta con saldo. La de ahorros es una cuenta normal más."""
+    """Cuenta con saldo. La de ahorros es una cuenta normal más.
+
+    Si tiene movimientos no se borra: se archiva (activa=false) para no romper
+    el histórico; sin movimientos sí se elimina de verdad."""
 
     __tablename__ = "account"
 
@@ -23,6 +26,9 @@ class Account(Base):
     tipo: Mapped[str] = mapped_column(String(30), nullable=False)
     saldo: Mapped[Decimal] = mapped_column(
         Numeric(14, 2), nullable=False, server_default=text("0")
+    )
+    activa: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
     )
 
 

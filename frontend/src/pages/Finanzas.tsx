@@ -399,15 +399,34 @@ function Cuentas({
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
         {accounts.map((a) => (
-          <button
+          <div
             key={a.id}
             onClick={() => onAbrir(a)}
-            className="card text-left p-4 hover:border-teal transition"
+            className="group card relative cursor-pointer text-left p-4 hover:border-teal transition"
           >
             <div className="text-sm text-muted">{a.nombre}</div>
             <div className="text-lg font-semibold">${fmtMoney(a.saldo)}</div>
             <div className="text-xs text-faint mt-1">{a.tipo} · ver movimientos →</div>
-          </button>
+            {Number(a.saldo) === 0 && (
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation()
+                  if (!window.confirm(`¿Eliminar la cuenta «${a.nombre}»?`)) return
+                  const { resultado } = await api.deleteAccount(a.id)
+                  if (resultado === 'archivada')
+                    window.alert(
+                      `«${a.nombre}» tenía movimientos, así que se archivó: ` +
+                        'deja de aparecer, pero su histórico se conserva.'
+                    )
+                  onCambio()
+                }}
+                title="Eliminar cuenta (está en cero)"
+                className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 text-faint hover:text-[color:var(--c-danger)] transition"
+              >
+                🗑
+              </button>
+            )}
+          </div>
         ))}
       </div>
       <form onSubmit={crear} className="flex flex-wrap gap-2">
