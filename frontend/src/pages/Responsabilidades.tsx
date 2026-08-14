@@ -234,17 +234,39 @@ export default function Responsabilidades() {
         <p className="text-faint">Sin responsabilidades.</p>
       ) : (
         <ul className="space-y-2">
-          {items.map((r) => (
+          {items.map((r) => {
+            const hoy = new Date()
+            hoy.setHours(0, 0, 0, 0)
+            const venc = new Date(r.proximo_venc + 'T00:00')
+            const vencida = venc < hoy
+            const esHoy = venc.getTime() === hoy.getTime()
+            return (
             <li
               key={r.id}
               className="card px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+              style={
+                vencida
+                  ? { borderColor: 'color-mix(in srgb, var(--c-danger) 45%, var(--c-line))' }
+                  : undefined
+              }
             >
               <div className="min-w-0">
                 <p className="font-medium">{r.nombre}</p>
                 <p className="text-xs text-muted mt-1">
                   {labelRec(r.recurrencia)} ·{' '}
-                  {r.recurrencia === 'unica' ? 'vence:' : 'próximo:'}{' '}
-                  {new Date(r.proximo_venc + 'T00:00').toLocaleDateString('es-CO')}
+                  {vencida ? (
+                    <span className="text-[color:var(--c-danger)] font-medium">
+                      ⏰ venció el{' '}
+                      {venc.toLocaleDateString('es-CO')}
+                    </span>
+                  ) : esHoy ? (
+                    <span className="pill pill-warn">vence hoy</span>
+                  ) : (
+                    <>
+                      {r.recurrencia === 'unica' ? 'vence:' : 'próximo:'}{' '}
+                      {venc.toLocaleDateString('es-CO')}
+                    </>
+                  )}
                   {r.monto && ` · $${fmtMoney(r.monto)}`}
                   {r.cuenta && ` · ${r.cuenta}`}
                   {r.categoria && ` · ${r.categoria}`}
@@ -254,8 +276,15 @@ export default function Responsabilidades() {
                 <button
                   onClick={() => setPagando(r)}
                   className="btn text-sm py-1"
-                  style={{ background: 'var(--c-green)', color: '#fff' }}
-                  title="Registrar el pago (puedes ajustar el monto de este mes)"
+                  style={{
+                    background: vencida ? 'var(--c-danger)' : 'var(--c-green)',
+                    color: '#fff',
+                  }}
+                  title={
+                    vencida
+                      ? 'Está vencida: registra el pago para ponerla al día'
+                      : 'Registrar el pago (puedes ajustar el monto de este mes)'
+                  }
                 >
                   Registrar pago
                 </button>
@@ -275,7 +304,8 @@ export default function Responsabilidades() {
                 </button>
               </div>
             </li>
-          ))}
+            )
+          })}
         </ul>
       )}
     </div>
