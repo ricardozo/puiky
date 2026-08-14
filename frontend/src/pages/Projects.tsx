@@ -134,6 +134,7 @@ function Detalle({
   const [projects, setProjects] = useState<Project[]>([])
   const [nuevo, setNuevo] = useState('')
   const [cargando, setCargando] = useState(true)
+  const [verArchivados, setVerArchivados] = useState(false)
   const [editandoPf, setEditandoPf] = useState(false)
   const [nombrePf, setNombrePf] = useState(
     sel.tipo === 'portafolio' ? sel.pf.nombre : ''
@@ -239,10 +240,23 @@ function Detalle({
         )}
       </div>
 
-      <p className="text-sm text-muted">
-        Un proyecto agrupa tareas hacia un objetivo, con su avance, fechas y notas.
-        Ábrelo para ver su tablero.
-      </p>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-sm text-muted">
+          Un proyecto agrupa tareas hacia un objetivo, con su avance, fechas y notas.
+          Ábrelo para ver su tablero.
+        </p>
+        {projects.some((p) => p.estado === 'terminado') && (
+          <label className="text-sm text-muted flex items-center gap-2 shrink-0">
+            <input
+              type="checkbox"
+              checked={verArchivados}
+              onChange={(e) => setVerArchivados(e.target.checked)}
+              className="accent-[color:var(--c-teal)]"
+            />
+            Ver archivados ({projects.filter((p) => p.estado === 'terminado').length})
+          </label>
+        )}
+      </div>
 
       <form onSubmit={crear} className="flex gap-2 max-w-xl">
         <input
@@ -264,23 +278,45 @@ function Detalle({
         <p className="text-faint">Sin proyectos aquí.</p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {projects.map((p) => {
+          {projects
+            .filter((p) => verArchivados || p.estado !== 'terminado')
+            .map((p) => {
             const vencido =
               !!p.fecha_fin && p.fecha_fin < hoyISO() && p.estado !== 'terminado'
             return (
             <div
               key={p.id}
               onClick={() => navigate(`/proyectos/${p.id}`)}
-              className="group card cursor-pointer p-4 hover:border-teal transition"
+              className={`group card cursor-pointer p-4 hover:border-teal transition ${
+                p.estado === 'terminado' ? 'opacity-60' : ''
+              }`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="font-medium">
                   {p.es_personal && '🏠 '}
                   {p.nombre}
                 </div>
-                <span className={`pill shrink-0 ${colorEstado[p.estado] ?? 'pill-mute'}`}>
-                  {p.estado}
-                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className={`pill ${colorEstado[p.estado] ?? 'pill-mute'}`}>
+                    {p.estado}
+                  </span>
+                  {!p.es_personal && p.total_tareas === 0 && (
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        if (!window.confirm(`¿Eliminar el proyecto «${p.nombre}»?`))
+                          return
+                        await api.deleteProject(p.id)
+                        cargar()
+                        onCambio()
+                      }}
+                      title="Eliminar proyecto (está vacío)"
+                      className="opacity-0 group-hover:opacity-100 text-faint hover:text-[color:var(--c-danger)] transition"
+                    >
+                      🗑
+                    </button>
+                  )}
+                </div>
               </div>
               {p.descripcion && (
                 <p className="text-xs text-muted mt-1 line-clamp-2">{p.descripcion}</p>

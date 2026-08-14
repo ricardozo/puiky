@@ -258,14 +258,32 @@ function ProjectHeader({
           {new Date(project.fecha_fin + 'T00:00').toLocaleDateString('es-CO')}
         </p>
       )}
-      {!project.es_personal && project.total_tareas === 0 && (
-        <button
-          onClick={eliminar}
-          className="text-faint hover:text-[color:var(--c-danger)] text-xs transition"
-        >
-          🗑 Eliminar proyecto (está vacío)
-        </button>
-      )}
+      <div className="flex items-center gap-4">
+        {!project.es_personal && project.estado !== 'terminado' && (
+          <button
+            onClick={() => {
+              if (
+                !window.confirm(
+                  `¿Archivar «${project.nombre}»? Pasa a terminado y sale de la lista (recuperable con «Ver archivados»).`
+                )
+              )
+                return
+              guardar({ estado: 'terminado' })
+            }}
+            className="text-faint hover:text-ink text-xs transition"
+          >
+            📦 Archivar proyecto
+          </button>
+        )}
+        {!project.es_personal && project.total_tareas === 0 && (
+          <button
+            onClick={eliminar}
+            className="text-faint hover:text-[color:var(--c-danger)] text-xs transition"
+          >
+            🗑 Eliminar proyecto (está vacío)
+          </button>
+        )}
+      </div>
     </div>
   )
 }
