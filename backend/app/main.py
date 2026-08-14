@@ -30,6 +30,7 @@ from app.routers import (
     reminders,
     responsibilities,
     tasks,
+    time_entries,
     whatsapp,
 )
 
@@ -78,5 +79,6 @@ app.include_router(finances.categories_router, dependencies=_protegido)
 app.include_router(finances.transactions_router, dependencies=_protegido)
 app.include_router(finances.budgets_router, dependencies=_protegido)
 app.include_router(reminders.router, dependencies=_protegido)
+app.include_router(time_entries.router, dependencies=_protegido)
 app.include_router(market.router, dependencies=_protegido)
 app.include_router(nlu.router, dependencies=_protegido)

@@ -21,6 +21,7 @@ from app.models.projects import Project
 from app.models.reminders import Reminder
 from app.models.responsibilities import Responsibility
 from app.models.tasks import ChecklistItem, Task
+from app.models.time_entries import TimeEntry
 from app.models.users import TelegramLink, User
 
 __all__ = [
@@ -47,5 +48,6 @@ __all__ = [
     "Reminder",
     "Responsibility",
     "Task",
+    "TimeEntry",
     "Transaction",
 ]

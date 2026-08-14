@@ -179,6 +179,17 @@ export interface EditarTransaccion {
   nota?: string | null
 }
 
+export interface TimeEntry {
+  id: string
+  task_id: string
+  inicio: string
+  fin: string | null
+  nota: string | null
+  tarea: string | null
+  proyecto: string | null
+  project_id: string | null
+}
+
 export interface Reminder {
   id: string
   origen_tipo: string | null
@@ -341,6 +352,27 @@ export const api = {
   listTasks: (q?: string) =>
     request<Task[]>(`/tasks${q ? `?q=${encodeURIComponent(q)}` : ''}`),
   listRecurringTasks: () => request<Task[]>('/tasks/recurrentes'),
+
+  // Registro de tiempo
+  timeStart: (taskId: string) =>
+    request<TimeEntry>('/time/start', {
+      method: 'POST',
+      body: JSON.stringify({ task_id: taskId }),
+    }),
+  timeStop: () => request<TimeEntry>('/time/stop', { method: 'POST' }),
+  timeCurrent: () => request<TimeEntry | null>('/time/actual'),
+  listTimeEntries: (dia?: string) =>
+    request<TimeEntry[]>(`/time${dia ? `?dia=${dia}` : ''}`),
+  updateTimeEntry: (
+    id: string,
+    cambios: { inicio?: string; fin?: string; nota?: string | null }
+  ) =>
+    request<TimeEntry>(`/time/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(cambios),
+    }),
+  deleteTimeEntry: (id: string) =>
+    request<void>(`/time/${id}`, { method: 'DELETE' }),
   createProject: (nombre: string, portfolioId?: string | null) =>
     request<Project>('/projects', {
       method: 'POST',

@@ -11,6 +11,7 @@ import Finanzas from './pages/Finanzas'
 import Recordatorios from './pages/Recordatorios'
 import Responsabilidades from './pages/Responsabilidades'
 import Tareas from './pages/Tareas'
+import Tiempo from './pages/Tiempo'
 import Concepto from './pages/Concepto'
 import Mercado from './pages/Mercado'
 
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="proyectos" element={<Projects />} />
         <Route path="proyectos/:id" element={<Board />} />
         <Route path="tareas" element={<Tareas />} />
+        <Route path="tiempo" element={<Tiempo />} />
         <Route path="finanzas" element={<Finanzas />} />
         <Route path="mercado" element={<Mercado />} />
         <Route path="responsabilidades" element={<Responsabilidades />} />

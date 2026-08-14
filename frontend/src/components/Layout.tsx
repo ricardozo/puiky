@@ -144,6 +144,7 @@ const SECCIONES = [
   { to: '/notas', label: 'Notas', icon: '📝' },
   { to: '/proyectos', label: 'Proyectos', icon: '📋' },
   { to: '/tareas', label: 'Tareas', icon: '✅' },
+  { to: '/tiempo', label: 'Tiempo', icon: '⏱' },
   { to: '/finanzas', label: 'Finanzas', icon: '💰' },
   { to: '/mercado', label: 'Mercado', icon: '🛒' },
   { to: '/responsabilidades', label: 'Responsabilidades', icon: '🔁' },
