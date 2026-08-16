@@ -36,6 +36,16 @@ def sesion_actual(db: Session = Depends(get_db)) -> TimeEntryOut | None:
     return service.current_entry(db)
 
 
+@router.get("/resumen")
+def resumen_mensual(
+    anio: int = Query(ge=2000, le=9999),
+    mes: int = Query(ge=1, le=12),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Consolidado del mes: total, por tarea, por proyecto y por día."""
+    return service.month_summary(db, anio, mes)
+
+
 @router.get("", response_model=list[TimeEntryOut])
 def listar_sesiones(
     dia: date | None = Query(default=None),

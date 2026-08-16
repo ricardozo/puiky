@@ -190,6 +190,16 @@ export interface TimeEntry {
   project_id: string | null
 }
 
+export interface TimeResumen {
+  anio: number
+  mes: number
+  total_min: number
+  dias_activos: number
+  por_tarea: { tarea: string; proyecto: string; min: number }[]
+  por_proyecto: { proyecto: string; min: number }[]
+  por_dia: { dia: number; min: number }[]
+}
+
 export interface Reminder {
   id: string
   origen_tipo: string | null
@@ -363,6 +373,8 @@ export const api = {
   timeCurrent: () => request<TimeEntry | null>('/time/actual'),
   listTimeEntries: (dia?: string) =>
     request<TimeEntry[]>(`/time${dia ? `?dia=${dia}` : ''}`),
+  timeResumen: (anio: number, mes: number) =>
+    request<TimeResumen>(`/time/resumen?anio=${anio}&mes=${mes}`),
   updateTimeEntry: (
     id: string,
     cambios: { inicio?: string; fin?: string; nota?: string | null }

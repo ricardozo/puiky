@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { api, ApiError, type Task, type TimeEntry } from '../api'
+import { api, ApiError, type Task, type TimeEntry, type TimeResumen } from '../api'
 
 // Preferencia local del largo del pomodoro (minutos).
 const POMO_KEY = 'puiky_pomodoro_min'
@@ -26,6 +26,23 @@ function fmtCrono(seg: number): string {
 
 const hora = (iso: string) =>
   new Date(iso).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' })
+
+const ymd = (d: Date) => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`
+const hoyYmd = () => ymd(new Date())
+
+const MESES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+]
+
+const etiquetaDia = (iso: string) => {
+  if (iso === hoyYmd()) return 'Hoy'
+  return new Date(iso + 'T00:00').toLocaleDateString('es-CO', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+  })
+}
 
 // ISO -> valor de input datetime-local en hora local.
 function aLocalInput(iso: string): string {
@@ -63,12 +80,21 @@ export default function Tiempo() {
   const [editando, setEditando] = useState<TimeEntry | null>(null)
   const [otraTarea, setOtraTarea] = useState('')
   const [error, setError] = useState('')
+  const [dia, setDia] = useState(hoyYmd)
   const avisado = useRef(false)
+
+  const esHoyDia = dia === hoyYmd()
 
   const cargar = useCallback(() => {
     api.timeCurrent().then(setActual)
-    api.listTimeEntries().then(setEntries)
-  }, [])
+    api.listTimeEntries(dia).then(setEntries)
+  }, [dia])
+
+  const moverDia = (delta: number) => {
+    const d = new Date(dia + 'T00:00')
+    d.setDate(d.getDate() + delta)
+    setDia(ymd(d))
+  }
 
   useEffect(() => {
     api.listTasks().then(setTasks)
@@ -260,12 +286,38 @@ export default function Tiempo() {
       </div>
       {error && <p className="text-[color:var(--c-danger)] text-sm">{error}</p>}
 
-      {/* Resumen y sesiones de hoy */}
-      {entries.length > 0 && (
+      {/* Día navegable: resumen y sesiones */}
+      <div className="flex items-center gap-2">
+        <button onClick={() => moverDia(-1)} className="btn-ghost btn px-2 py-1">
+          ◀
+        </button>
+        <span className="font-medium capitalize min-w-36 text-center">
+          {etiquetaDia(dia)}
+        </span>
+        <button
+          onClick={() => moverDia(1)}
+          disabled={esHoyDia}
+          className="btn-ghost btn px-2 py-1 disabled:opacity-30"
+        >
+          ▶
+        </button>
+        {!esHoyDia && (
+          <button
+            onClick={() => setDia(hoyYmd())}
+            className="text-sm text-muted hover:text-ink transition ml-1"
+          >
+            hoy
+          </button>
+        )}
+      </div>
+
+      {entries.length === 0 ? (
+        <p className="text-faint text-sm">Sin tiempo registrado ese día.</p>
+      ) : (
         <>
           <section className="card p-4 space-y-2">
             <div className="flex items-baseline justify-between">
-              <h3 className="eyebrow">Hoy</h3>
+              <h3 className="eyebrow capitalize">{etiquetaDia(dia)}</h3>
               <span className="font-serif text-xl">{fmtDur(totales.total)}</span>
             </div>
             {totales.filas.map((f) => (
@@ -280,7 +332,7 @@ export default function Tiempo() {
           </section>
 
           <div className="space-y-2">
-            <h3 className="eyebrow">Sesiones de hoy</h3>
+            <h3 className="eyebrow">Sesiones</h3>
             <ul className="space-y-2">
               {entries.map((e) => (
                 <li
@@ -329,6 +381,8 @@ export default function Tiempo() {
         </>
       )}
 
+      <ResumenMes recargar={entries} />
+
       {editando && (
         <EditorSesion
           entry={editando}
@@ -340,6 +394,129 @@ export default function Tiempo() {
         />
       )}
     </div>
+  )
+}
+
+function ResumenMes({ recargar }: { recargar: unknown }) {
+  const [fecha, setFecha] = useState(() => {
+    const d = new Date()
+    return { anio: d.getFullYear(), mes: d.getMonth() + 1 }
+  })
+  const [resumen, setResumen] = useState<TimeResumen | null>(null)
+
+  useEffect(() => {
+    api.timeResumen(fecha.anio, fecha.mes).then(setResumen)
+    // `recargar` fuerza refresco cuando cambian las sesiones del día.
+  }, [fecha, recargar])
+
+  const mover = (delta: number) => {
+    const d = new Date(fecha.anio, fecha.mes - 1 + delta, 1)
+    setFecha({ anio: d.getFullYear(), mes: d.getMonth() + 1 })
+  }
+
+  if (!resumen) return null
+  const maxTarea = Math.max(1, ...resumen.por_tarea.map((f) => f.min))
+  const maxDia = Math.max(1, ...resumen.por_dia.map((f) => f.min))
+  const diasDelMes = new Date(fecha.anio, fecha.mes, 0).getDate()
+  const minPorDia = new Map(resumen.por_dia.map((f) => [f.dia, f.min]))
+  const promedio =
+    resumen.dias_activos > 0
+      ? Math.round(resumen.total_min / resumen.dias_activos)
+      : 0
+
+  return (
+    <section className="card p-4 space-y-3">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <button onClick={() => mover(-1)} className="btn-ghost btn px-2 py-1">
+            ◀
+          </button>
+          <h3 className="eyebrow">
+            {MESES[fecha.mes - 1]} {fecha.anio}
+          </h3>
+          <button onClick={() => mover(1)} className="btn-ghost btn px-2 py-1">
+            ▶
+          </button>
+        </div>
+        <div className="text-right">
+          <span className="font-serif text-xl">{fmtDur(resumen.total_min * 60)}</span>
+          {resumen.dias_activos > 0 && (
+            <span className="text-xs text-faint block">
+              {resumen.dias_activos} día{resumen.dias_activos === 1 ? '' : 's'} ·{' '}
+              {fmtDur(promedio * 60)}/día
+            </span>
+          )}
+        </div>
+      </div>
+
+      {resumen.total_min === 0 ? (
+        <p className="text-faint text-sm">Sin tiempo registrado este mes.</p>
+      ) : (
+        <>
+          {/* Tira de días: qué días hubo registro y cuánto */}
+          <div className="flex gap-[3px] items-end" title="Días del mes">
+            {Array.from({ length: diasDelMes }, (_, i) => {
+              const m = minPorDia.get(i + 1) ?? 0
+              return (
+                <div
+                  key={i}
+                  className="flex-1 rounded-sm"
+                  title={`${i + 1}: ${m ? fmtDur(m * 60) : 'sin registro'}`}
+                  style={{
+                    height: m ? `${8 + (m / maxDia) * 26}px` : '4px',
+                    background: m
+                      ? 'var(--c-teal)'
+                      : 'var(--c-surface-2)',
+                    opacity: m ? 0.4 + (m / maxDia) * 0.6 : 1,
+                  }}
+                />
+              )
+            })}
+          </div>
+
+          <div className="space-y-1.5">
+            <h4 className="text-xs text-faint uppercase tracking-wide">Por tarea</h4>
+            {resumen.por_tarea.map((f) => (
+              <div key={f.tarea} className="text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted truncate">
+                    {f.tarea}
+                    <span className="text-faint text-xs"> · {f.proyecto}</span>
+                  </span>
+                  <span className="tabular-nums shrink-0">{fmtDur(f.min * 60)}</span>
+                </div>
+                <div className="h-1 rounded-full bg-[color:var(--c-surface-2)] overflow-hidden mt-0.5">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${(f.min / maxTarea) * 100}%`,
+                      background: 'var(--c-teal)',
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {resumen.por_proyecto.length > 1 && (
+            <div className="space-y-1">
+              <h4 className="text-xs text-faint uppercase tracking-wide">
+                Por proyecto
+              </h4>
+              {resumen.por_proyecto.map((f) => (
+                <div
+                  key={f.proyecto}
+                  className="flex items-center justify-between text-sm border-t border-line pt-1"
+                >
+                  <span className="text-muted truncate">{f.proyecto}</span>
+                  <span className="tabular-nums shrink-0">{fmtDur(f.min * 60)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </section>
   )
 }
 

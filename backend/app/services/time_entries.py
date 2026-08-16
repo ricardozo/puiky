@@ -81,6 +81,56 @@ def list_entries(db: Session, dia: date | None = None) -> list[TimeEntry]:
     return [_enriquecer(db, e) for e in entries]
 
 
+def month_summary(db: Session, anio: int, mes: int) -> dict:
+    """Consolidado del mes: total, por tarea, por proyecto y por día.
+    Las sesiones corriendo cuentan hasta ahora. Minutos redondeados."""
+    tz = zona()
+    desde = datetime(anio, mes, 1, tzinfo=tz)
+    hasta = (
+        datetime(anio + 1, 1, 1, tzinfo=tz)
+        if mes == 12
+        else datetime(anio, mes + 1, 1, tzinfo=tz)
+    )
+    entries = db.execute(
+        select(TimeEntry).where(TimeEntry.inicio >= desde, TimeEntry.inicio < hasta)
+    ).scalars().all()
+
+    ahora = now_local()
+    por_tarea: dict[str, dict] = {}
+    por_proyecto: dict[str, int] = {}
+    por_dia: dict[int, int] = {}
+    total = 0
+    for e in entries:
+        _enriquecer(db, e)
+        fin = e.fin or ahora
+        minutos = max(0, round((fin - e.inicio).total_seconds() / 60))
+        total += minutos
+        tarea = e.tarea or "(tarea eliminada)"  # type: ignore[attr-defined]
+        proyecto = e.proyecto or "(sin proyecto)"  # type: ignore[attr-defined]
+        fila = por_tarea.setdefault(
+            tarea, {"tarea": tarea, "proyecto": proyecto, "min": 0}
+        )
+        fila["min"] += minutos
+        por_proyecto[proyecto] = por_proyecto.get(proyecto, 0) + minutos
+        dia = e.inicio.astimezone(tz).day
+        por_dia[dia] = por_dia.get(dia, 0) + minutos
+
+    return {
+        "anio": anio,
+        "mes": mes,
+        "total_min": total,
+        "dias_activos": len(por_dia),
+        "por_tarea": sorted(por_tarea.values(), key=lambda f: -f["min"]),
+        "por_proyecto": [
+            {"proyecto": p, "min": m}
+            for p, m in sorted(por_proyecto.items(), key=lambda kv: -kv[1])
+        ],
+        "por_dia": [
+            {"dia": d, "min": m} for d, m in sorted(por_dia.items())
+        ],
+    }
+
+
 def update_entry(
     db: Session, entry_id: uuid.UUID, data: TimeEntryUpdate
 ) -> TimeEntry | None:
