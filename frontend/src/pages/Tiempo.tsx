@@ -416,9 +416,6 @@ function ResumenMes({ recargar }: { recargar: unknown }) {
 
   if (!resumen) return null
   const maxTarea = Math.max(1, ...resumen.por_tarea.map((f) => f.min))
-  const maxDia = Math.max(1, ...resumen.por_dia.map((f) => f.min))
-  const diasDelMes = new Date(fecha.anio, fecha.mes, 0).getDate()
-  const minPorDia = new Map(resumen.por_dia.map((f) => [f.dia, f.min]))
   const promedio =
     resumen.dias_activos > 0
       ? Math.round(resumen.total_min / resumen.dias_activos)
@@ -453,27 +450,6 @@ function ResumenMes({ recargar }: { recargar: unknown }) {
         <p className="text-faint text-sm">Sin tiempo registrado este mes.</p>
       ) : (
         <>
-          {/* Tira de días: qué días hubo registro y cuánto */}
-          <div className="flex gap-[3px] items-end" title="Días del mes">
-            {Array.from({ length: diasDelMes }, (_, i) => {
-              const m = minPorDia.get(i + 1) ?? 0
-              return (
-                <div
-                  key={i}
-                  className="flex-1 rounded-sm"
-                  title={`${i + 1}: ${m ? fmtDur(m * 60) : 'sin registro'}`}
-                  style={{
-                    height: m ? `${8 + (m / maxDia) * 26}px` : '4px',
-                    background: m
-                      ? 'var(--c-teal)'
-                      : 'var(--c-surface-2)',
-                    opacity: m ? 0.4 + (m / maxDia) * 0.6 : 1,
-                  }}
-                />
-              )
-            })}
-          </div>
-
           <div className="space-y-1.5">
             <h4 className="text-xs text-faint uppercase tracking-wide">Por tarea</h4>
             {resumen.por_tarea.map((f) => (
