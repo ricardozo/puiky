@@ -475,19 +475,35 @@ function ResumenMes({ recargar }: { recargar: unknown }) {
           </div>
 
           {resumen.por_proyecto.length > 1 && (
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <h4 className="text-xs text-faint uppercase tracking-wide">
                 Por proyecto
               </h4>
-              {resumen.por_proyecto.map((f) => (
-                <div
-                  key={f.proyecto}
-                  className="flex items-center justify-between text-sm border-t border-line pt-1"
-                >
-                  <span className="text-muted truncate">{f.proyecto}</span>
-                  <span className="tabular-nums shrink-0">{fmtDur(f.min * 60)}</span>
-                </div>
-              ))}
+              {resumen.por_proyecto.map((f) => {
+                const maxProyecto = Math.max(
+                  1,
+                  ...resumen.por_proyecto.map((x) => x.min)
+                )
+                return (
+                  <div key={f.proyecto} className="text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-muted truncate">{f.proyecto}</span>
+                      <span className="tabular-nums shrink-0">
+                        {fmtDur(f.min * 60)}
+                      </span>
+                    </div>
+                    <div className="h-1 rounded-full bg-[color:var(--c-surface-2)] overflow-hidden mt-0.5">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${(f.min / maxProyecto) * 100}%`,
+                          background: 'var(--c-teal)',
+                        }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </>
