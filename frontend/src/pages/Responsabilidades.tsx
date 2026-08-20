@@ -45,19 +45,26 @@ export default function Responsabilidades() {
   const [editando, setEditando] = useState<Responsibility | null>(null)
   const [pagando, setPagando] = useState<Responsibility | null>(null)
 
-  // Resumen: total y desglose por categoría, en equivalente mensual.
+  // Resumen: total y desglose por categoría, en equivalente mensual. Las
+  // categorías cuyos compromisos no tienen monto también aparecen (con «—» o
+  // asterisco): que no se esfumen del mapa solo por faltar la cifra.
   const resumen = useMemo(() => {
     let total = 0
     const porCat = new Map<string, number>()
+    const sinMonto = new Set<string>()
     for (const r of items) {
-      if (!r.monto) continue
+      const cat = r.categoria ?? '(sin categoría)'
+      if (!r.monto) {
+        sinMonto.add(cat)
+        if (!porCat.has(cat)) porCat.set(cat, 0)
+        continue
+      }
       const mensual = Number(r.monto) * factorMensual(r.recurrencia)
       total += mensual
-      const cat = r.categoria ?? '(sin categoría)'
       porCat.set(cat, (porCat.get(cat) ?? 0) + mensual)
     }
     const categorias = [...porCat.entries()].sort((a, b) => b[1] - a[1])
-    return { total, categorias }
+    return { total, categorias, sinMonto }
   }, [items])
 
   const cargar = () =>
@@ -212,7 +219,8 @@ export default function Responsabilidades() {
           </div>
           <p className="text-xs text-faint">
             Convierte cada compromiso a su costo mensual (anual ÷12, trimestral ÷3,
-            etc.). Solo cuenta los que tienen monto.
+            etc.). El * marca categorías con compromisos sin monto (no suman al
+            total; pónselo con «Editar»).
           </p>
           <div className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
             {resumen.categorias.map(([cat, m]) => (
@@ -220,8 +228,17 @@ export default function Responsabilidades() {
                 key={cat}
                 className="flex items-center justify-between text-sm border-t border-line pt-1.5"
               >
-                <span className="text-muted truncate">{cat}</span>
-                <span className="tabular-nums shrink-0">${fmtMoney(Math.round(m))}</span>
+                <span className="text-muted truncate">
+                  {cat}
+                  {resumen.sinMonto.has(cat) && (
+                    <span className="text-faint" title="Tiene compromisos sin monto">
+                      {' '}*
+                    </span>
+                  )}
+                </span>
+                <span className="tabular-nums shrink-0">
+                  {m > 0 ? `$${fmtMoney(Math.round(m))}` : '—'}
+                </span>
               </div>
             ))}
           </div>
