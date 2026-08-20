@@ -1507,7 +1507,7 @@ TOOLS: list[Tool] = [
     Tool(
         "crear_recordatorio",
         "Crea un recordatorio. `disparar_en` en ISO 8601 (usa la fecha/hora actual "
-        "del contexto). `recurrencia` opcional (diaria|semanal|mensual|trimestral|"
+        "del contexto). `recurrencia` opcional (diaria|semanal|mensual|bimestral|trimestral|"
         "anual|cada_N_dias): si se da, al resolverlo reaparece el siguiente periodo "
         "(p. ej. «recuérdame cada mes enviar la cuenta de cobro»).",
         _p(
@@ -1519,7 +1519,7 @@ TOOLS: list[Tool] = [
     Tool(
         "crear_responsabilidad",
         "Crea un compromiso de pago (arriendo, administración, una deuda). "
-        "recurrencia: unica|diaria|semanal|mensual|trimestral|anual|cada_N_dias "
+        "recurrencia: unica|diaria|semanal|mensual|bimestral|trimestral|anual|cada_N_dias "
         "(unica = deuda de un solo pago; al pagarla desaparece). "
         "proximo_venc en YYYY-MM-DD. Opcional: monto, y cuenta/categoria para que "
         "al pagarlo se registre el gasto en finanzas.",

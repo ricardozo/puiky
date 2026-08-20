@@ -8,7 +8,9 @@ import {
   type Responsibility,
 } from '../api'
 
-const RECURRENCIAS = ['unica', 'diaria', 'semanal', 'mensual', 'trimestral', 'anual']
+const RECURRENCIAS = [
+  'unica', 'diaria', 'semanal', 'mensual', 'bimestral', 'trimestral', 'anual',
+]
 
 // Factor para convertir cada recurrencia a su costo mensual equivalente.
 // «unica» no entra al resumen: es un pago de una sola vez, no un costo mensual.
@@ -17,6 +19,7 @@ const FACTOR_MENSUAL: Record<string, number> = {
   diaria: 365 / 12,
   semanal: 52 / 12,
   mensual: 1,
+  bimestral: 1 / 2,
   trimestral: 1 / 3,
   anual: 1 / 12,
 }

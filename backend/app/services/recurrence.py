@@ -1,7 +1,7 @@
 """Cálculo de recurrencias para responsabilidades.
 
 Gramática canónica de `recurrencia`:
-  diaria | semanal | mensual | trimestral | anual | cada_<N>_dias
+  diaria | semanal | mensual | bimestral | trimestral | anual | cada_<N>_dias
 
 Se resuelve sin dependencias externas (suma manual de meses con ajuste de
 fin de mes), para no añadir librerías ni reconstruir la imagen.
@@ -11,7 +11,7 @@ import calendar
 import re
 from datetime import date, timedelta
 
-_SIMPLES = {"diaria", "semanal", "mensual", "trimestral", "anual"}
+_SIMPLES = {"diaria", "semanal", "mensual", "bimestral", "trimestral", "anual"}
 _CADA_N = re.compile(r"^cada_(\d+)_dias$")
 
 
@@ -38,6 +38,8 @@ def siguiente_vencimiento(desde: date, recurrencia: str) -> date:
         return desde + timedelta(days=7)
     if recurrencia == "mensual":
         return _sumar_meses(desde, 1)
+    if recurrencia == "bimestral":  # cada 2 meses (acueducto, gas)
+        return _sumar_meses(desde, 2)
     if recurrencia == "trimestral":
         return _sumar_meses(desde, 3)
     if recurrencia == "anual":

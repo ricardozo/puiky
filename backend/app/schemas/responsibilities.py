@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.services.recurrence import es_recurrencia_valida
 
 _AYUDA_REC = (
-    "unica | diaria | semanal | mensual | trimestral | anual | cada_<N>_dias"
+    "unica | diaria | semanal | mensual | bimestral | trimestral | anual | cada_<N>_dias"
 )
 
 

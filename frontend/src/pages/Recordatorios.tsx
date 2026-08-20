@@ -41,6 +41,7 @@ const RECURRENCIAS = [
   ['diaria', 'Diario'],
   ['semanal', 'Semanal'],
   ['mensual', 'Mensual'],
+  ['bimestral', 'Bimestral (cada 2 meses)'],
   ['trimestral', 'Trimestral'],
   ['anual', 'Anual'],
 ] as const
@@ -271,6 +272,7 @@ export default function Recordatorios() {
           <option value="diaria">Diario</option>
           <option value="semanal">Semanal</option>
           <option value="mensual">Mensual</option>
+          <option value="bimestral">Bimestral (cada 2 meses)</option>
           <option value="trimestral">Trimestral</option>
           <option value="anual">Anual</option>
         </select>

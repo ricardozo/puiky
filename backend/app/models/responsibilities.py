@@ -24,7 +24,7 @@ class Responsibility(Base):
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
     )
     nombre: Mapped[str] = mapped_column(String(200), nullable=False)
-    # diaria / semanal / mensual / trimestral / anual / cada_N_dias
+    # diaria / semanal / mensual / bimestral / trimestral / anual / cada_N_dias
     recurrencia: Mapped[str] = mapped_column(String(30), nullable=False)
     proximo_venc: Mapped[date] = mapped_column(Date, nullable=False)
     monto: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)

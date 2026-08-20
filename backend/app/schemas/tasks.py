@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.services.recurrence import es_recurrencia_valida
 
-_AYUDA_REC = "diaria | semanal | mensual | trimestral | anual | cada_<N>_dias"
+_AYUDA_REC = "diaria | semanal | mensual | bimestral | trimestral | anual | cada_<N>_dias"
 
 
 def _validar_recurrencia_opcional(v: str | None) -> str | None:

@@ -163,6 +163,7 @@ const RECURRENCIAS = [
   { v: 'diaria', label: 'Diaria' },
   { v: 'semanal', label: 'Semanal' },
   { v: 'mensual', label: 'Mensual' },
+  { v: 'bimestral', label: 'Bimestral (cada 2 meses)' },
   { v: 'trimestral', label: 'Trimestral' },
   { v: 'anual', label: 'Anual' },
 ]
