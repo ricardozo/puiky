@@ -167,6 +167,7 @@ export interface NuevaTransaccion {
   account_id: string
   cuenta_destino_id?: string | null
   category_id?: string | null
+  fecha?: string // YYYY-MM-DD; por defecto hoy
   nota?: string | null
 }
 export interface EditarTransaccion {

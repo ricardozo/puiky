@@ -575,6 +575,7 @@ function Movimiento({
   const [destino, setDestino] = useState('')
   const [categoria, setCategoria] = useState('')
   const [nota, setNota] = useState('')
+  const [fecha, setFecha] = useState(hoyStr)
   const [error, setError] = useState('')
 
   const esTransfer = tipo === 'transferencia'
@@ -589,10 +590,12 @@ function Movimiento({
         account_id: cuenta,
         cuenta_destino_id: esTransfer ? destino : null,
         category_id: esTransfer ? null : categoria || null,
+        fecha,
         nota: nota || null,
       })
       setMonto('')
       setNota('')
+      setFecha(hoyStr())
       onCambio()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error registrando')
@@ -660,6 +663,14 @@ function Movimiento({
               ))}
           </select>
         )}
+        <input
+          value={fecha}
+          onChange={(e) => setFecha(e.target.value)}
+          type="date"
+          max={hoyStr()}
+          className="input w-auto"
+          title="Fecha del movimiento (hoy por defecto)"
+        />
         <input
           value={nota}
           onChange={(e) => setNota(e.target.value)}
