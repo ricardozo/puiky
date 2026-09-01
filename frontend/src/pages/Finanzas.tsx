@@ -407,6 +407,21 @@ function Cuentas({
             <div className="text-sm text-muted">{a.nombre}</div>
             <div className="text-lg font-semibold">${fmtMoney(a.saldo)}</div>
             <div className="text-xs text-faint mt-1">{a.tipo} · ver movimientos →</div>
+            <button
+              onClick={async (e) => {
+                e.stopPropagation()
+                const nuevo = window.prompt('Nuevo nombre de la cuenta:', a.nombre)
+                if (!nuevo || !nuevo.trim() || nuevo.trim() === a.nombre) return
+                await api.updateAccount(a.id, { nombre: nuevo.trim() })
+                onCambio()
+              }}
+              title="Renombrar cuenta"
+              className={`absolute top-3 ${
+                Number(a.saldo) === 0 ? 'right-9' : 'right-3'
+              } opacity-0 group-hover:opacity-100 text-faint hover:text-brand transition`}
+            >
+              ✎
+            </button>
             {Number(a.saldo) === 0 && (
               <button
                 onClick={async (e) => {

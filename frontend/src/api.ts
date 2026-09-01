@@ -490,6 +490,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ nombre, tipo, saldo_inicial: saldoInicial }),
     }),
+  updateAccount: (id: string, cambios: { nombre?: string; tipo?: string }) =>
+    request<Account>(`/accounts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(cambios),
+    }),
   // Solo cuentas en cero. Sin movimientos se borra; con movimientos se archiva.
   deleteAccount: (id: string) =>
     request<{ resultado: 'eliminada' | 'archivada' }>(`/accounts/${id}`, {
