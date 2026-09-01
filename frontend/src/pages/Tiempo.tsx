@@ -24,6 +24,10 @@ function fmtCrono(seg: number): string {
   return h > 0 ? `${h}:${p2(m)}:${p2(s)}` : `${m}:${p2(s)}`
 }
 
+// Sin tildes y en minúsculas, para buscar «cocina» escribiendo «Cócina».
+const plano = (s: string) =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+
 const hora = (iso: string) =>
   new Date(iso).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' })
 
@@ -78,7 +82,7 @@ export default function Tiempo() {
   const [pomoMin, setPomoMin] = useState(pomoGuardado)
   const [ahora, setAhora] = useState(Date.now())
   const [editando, setEditando] = useState<TimeEntry | null>(null)
-  const [otraTarea, setOtraTarea] = useState('')
+  const [busqueda, setBusqueda] = useState('')
   const [error, setError] = useState('')
   const [dia, setDia] = useState(hoyYmd)
   const avisado = useRef(false)
@@ -265,24 +269,50 @@ export default function Tiempo() {
             )
           })}
         </div>
-        <select
-          value={otraTarea}
-          onChange={(e) => {
-            if (e.target.value) iniciar(e.target.value)
-            setOtraTarea('')
-          }}
-          className="input w-auto text-sm"
-        >
-          <option value="">▶ Otra tarea…</option>
-          {activas
-            .filter((t) => !tiles.some((x) => x.id === t.id))
-            .map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.titulo}
-                {t.proyecto ? ` · ${t.proyecto}` : ''}
-              </option>
-            ))}
-        </select>
+        <div className="max-w-md space-y-1">
+          <input
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="🔍 Buscar tarea o proyecto para arrancar…"
+            className="input w-full text-sm"
+          />
+          {busqueda.trim() && (
+            <ul className="card divide-y divide-[color:var(--c-line)] overflow-hidden">
+              {activas
+                .filter((t) => {
+                  const q = plano(busqueda.trim())
+                  return (
+                    plano(t.titulo).includes(q) ||
+                    (t.proyecto && plano(t.proyecto).includes(q))
+                  )
+                })
+                .slice(0, 8)
+                .map((t) => (
+                  <li key={t.id}>
+                    <button
+                      onClick={() => {
+                        iniciar(t.id)
+                        setBusqueda('')
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-[color:var(--c-surface-2)] transition"
+                    >
+                      ▶ {t.titulo}
+                      <span className="text-faint"> · {t.proyecto ?? 'sin proyecto'}</span>
+                    </button>
+                  </li>
+                ))}
+              {activas.filter((t) => {
+                const q = plano(busqueda.trim())
+                return (
+                  plano(t.titulo).includes(q) ||
+                  (t.proyecto && plano(t.proyecto).includes(q))
+                )
+              }).length === 0 && (
+                <li className="px-3 py-2 text-sm text-faint">Sin coincidencias.</li>
+              )}
+            </ul>
+          )}
+        </div>
       </div>
       {error && <p className="text-[color:var(--c-danger)] text-sm">{error}</p>}
 
