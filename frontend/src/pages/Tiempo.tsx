@@ -83,6 +83,7 @@ export default function Tiempo() {
   const [ahora, setAhora] = useState(Date.now())
   const [editando, setEditando] = useState<TimeEntry | null>(null)
   const [busqueda, setBusqueda] = useState('')
+  const [listaAbierta, setListaAbierta] = useState(false)
   const [error, setError] = useState('')
   const [dia, setDia] = useState(hoyYmd)
   const avisado = useRef(false)
@@ -270,29 +271,50 @@ export default function Tiempo() {
           })}
         </div>
         <div className="max-w-md space-y-1">
-          <input
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="🔍 Buscar tarea o proyecto para arrancar…"
-            className="input w-full text-sm"
-          />
-          {busqueda.trim() && (
-            <ul className="card divide-y divide-[color:var(--c-line)] overflow-hidden">
-              {activas
-                .filter((t) => {
-                  const q = plano(busqueda.trim())
-                  return (
-                    plano(t.titulo).includes(q) ||
-                    (t.proyecto && plano(t.proyecto).includes(q))
-                  )
-                })
-                .slice(0, 8)
-                .map((t) => (
+          <div className="flex gap-1">
+            <input
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              onFocus={() => setListaAbierta(true)}
+              onBlur={() => setTimeout(() => setListaAbierta(false), 150)}
+              placeholder="🔍 Buscar tarea o proyecto, o abre la lista…"
+              className="input flex-1 text-sm"
+            />
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                setListaAbierta((v) => !v)
+              }}
+              title="Ver todas las tareas"
+              className="btn-ghost btn px-3"
+            >
+              ▾
+            </button>
+          </div>
+          {(listaAbierta || busqueda.trim() !== '') && (() => {
+            const q = plano(busqueda.trim())
+            const resultados = activas
+              .filter(
+                (t) =>
+                  !q ||
+                  plano(t.titulo).includes(q) ||
+                  (t.proyecto && plano(t.proyecto).includes(q))
+              )
+              .sort((a, b) =>
+                (a.proyecto ?? '').localeCompare(b.proyecto ?? '') ||
+                a.titulo.localeCompare(b.titulo)
+              )
+            return (
+              <ul className="card divide-y divide-[color:var(--c-line)] overflow-y-auto max-h-72">
+                {resultados.map((t) => (
                   <li key={t.id}>
                     <button
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={() => {
                         iniciar(t.id)
                         setBusqueda('')
+                        setListaAbierta(false)
                       }}
                       className="w-full text-left px-3 py-2 text-sm hover:bg-[color:var(--c-surface-2)] transition"
                     >
@@ -301,17 +323,12 @@ export default function Tiempo() {
                     </button>
                   </li>
                 ))}
-              {activas.filter((t) => {
-                const q = plano(busqueda.trim())
-                return (
-                  plano(t.titulo).includes(q) ||
-                  (t.proyecto && plano(t.proyecto).includes(q))
-                )
-              }).length === 0 && (
-                <li className="px-3 py-2 text-sm text-faint">Sin coincidencias.</li>
-              )}
-            </ul>
-          )}
+                {resultados.length === 0 && (
+                  <li className="px-3 py-2 text-sm text-faint">Sin coincidencias.</li>
+                )}
+              </ul>
+            )
+          })()}
         </div>
       </div>
       {error && <p className="text-[color:var(--c-danger)] text-sm">{error}</p>}
