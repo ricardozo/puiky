@@ -710,15 +710,55 @@ function Movimientos({
   const [editando, setEditando] = useState<Transaction | null>(null)
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(0)
+  const [fDesde, setFDesde] = useState('')
+  const [fHasta, setFHasta] = useState('')
+  const [fCuenta, setFCuenta] = useState('')
+  const [fCategoria, setFCategoria] = useState('')
+  const [fTipo, setFTipo] = useState('')
+  const hayFiltro = !!(fDesde || fHasta || fCuenta || fCategoria || fTipo)
+  const limpiar = () => {
+    setFDesde('')
+    setFHasta('')
+    setFCuenta('')
+    setFCategoria('')
+    setFTipo('')
+    setPage(0)
+  }
   const eliminar = async (id: string) => {
     if (!window.confirm('¿Eliminar este movimiento? Se revertirá el saldo.')) return
     await api.deleteTransaction(id)
     onCambio()
   }
-  const totalPages = Math.max(1, Math.ceil(transactions.length / pageSize))
+  // Una cuenta incluye también las transferencias que llegan a ella.
+  const filtrados = useMemo(
+    () =>
+      transactions.filter(
+        (t) =>
+          (!fDesde || t.fecha >= fDesde) &&
+          (!fHasta || t.fecha <= fHasta) &&
+          (!fCuenta || t.account_id === fCuenta || t.cuenta_destino_id === fCuenta) &&
+          (!fCategoria || t.category_id === fCategoria) &&
+          (!fTipo || t.tipo === fTipo)
+      ),
+    [transactions, fDesde, fHasta, fCuenta, fCategoria, fTipo]
+  )
+  const sumas = useMemo(() => {
+    let gastos = 0
+    let ingresos = 0
+    for (const t of filtrados) {
+      if (t.tipo === 'gasto') gastos += Number(t.monto)
+      else if (t.tipo === 'ingreso') ingresos += Number(t.monto)
+    }
+    return { gastos, ingresos }
+  }, [filtrados])
+  const totalPages = Math.max(1, Math.ceil(filtrados.length / pageSize))
   const pageSafe = Math.min(page, totalPages - 1)
   const inicio = pageSafe * pageSize
-  const visibles = transactions.slice(inicio, inicio + pageSize)
+  const visibles = filtrados.slice(inicio, inicio + pageSize)
+  const conFiltro = (fn: (v: string) => void) => (v: string) => {
+    fn(v)
+    setPage(0)
+  }
   return (
     <section className="space-y-3">
       {editando && (
@@ -774,8 +814,100 @@ function Movimientos({
           )}
         </div>
       </div>
-      {transactions.length === 0 ? (
-        <p className="text-faint text-sm">Sin movimientos.</p>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <label className="text-xs text-muted flex items-center gap-1">
+          Desde
+          <input
+            type="date"
+            value={fDesde}
+            onChange={(e) => conFiltro(setFDesde)(e.target.value)}
+            className="input w-auto py-1"
+          />
+        </label>
+        <label className="text-xs text-muted flex items-center gap-1">
+          Hasta
+          <input
+            type="date"
+            value={fHasta}
+            onChange={(e) => conFiltro(setFHasta)(e.target.value)}
+            className="input w-auto py-1"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={() => {
+            const h = hoyStr()
+            setFDesde(h)
+            setFHasta(h)
+            setPage(0)
+          }}
+          className="btn-ghost btn text-xs py-1"
+        >
+          Hoy
+        </button>
+        <select
+          value={fCuenta}
+          onChange={(e) => conFiltro(setFCuenta)(e.target.value)}
+          className="input w-auto py-1"
+        >
+          <option value="">Todas las cuentas</option>
+          {accounts.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.nombre}
+            </option>
+          ))}
+        </select>
+        <select
+          value={fCategoria}
+          onChange={(e) => conFiltro(setFCategoria)(e.target.value)}
+          className="input w-auto py-1"
+        >
+          <option value="">Todas las categorías</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.nombre}
+            </option>
+          ))}
+        </select>
+        <select
+          value={fTipo}
+          onChange={(e) => conFiltro(setFTipo)(e.target.value)}
+          className="input w-auto py-1"
+        >
+          <option value="">Todos los tipos</option>
+          <option value="gasto">Gastos</option>
+          <option value="ingreso">Ingresos</option>
+          <option value="transferencia">Transferencias</option>
+        </select>
+        {hayFiltro && (
+          <button
+            type="button"
+            onClick={limpiar}
+            className="text-xs text-muted hover:text-ink transition"
+          >
+            ✕ Quitar filtros
+          </button>
+        )}
+      </div>
+      {hayFiltro && filtrados.length > 0 && (
+        <p className="text-xs text-muted">
+          {filtrados.length} movimiento{filtrados.length === 1 ? '' : 's'}
+          {sumas.gastos > 0 && (
+            <>
+              {' · '}gastos <span className={rojo}>${fmtMoney(sumas.gastos)}</span>
+            </>
+          )}
+          {sumas.ingresos > 0 && (
+            <>
+              {' · '}ingresos <span className={verde}>${fmtMoney(sumas.ingresos)}</span>
+            </>
+          )}
+        </p>
+      )}
+      {filtrados.length === 0 ? (
+        <p className="text-faint text-sm">
+          {hayFiltro ? 'Ningún movimiento con esos filtros.' : 'Sin movimientos.'}
+        </p>
       ) : (
         <ul className="card divide-y divide-[color:var(--c-line)] p-0 overflow-hidden">
           {visibles.map((t) => {
@@ -818,10 +950,10 @@ function Movimientos({
           })}
         </ul>
       )}
-      {transactions.length > 0 && (
+      {filtrados.length > 0 && (
         <p className="text-xs text-faint">
-          Mostrando {inicio + 1}–{Math.min(inicio + pageSize, transactions.length)} de{' '}
-          {transactions.length}
+          Mostrando {inicio + 1}–{Math.min(inicio + pageSize, filtrados.length)} de{' '}
+          {filtrados.length}
         </p>
       )}
     </section>
