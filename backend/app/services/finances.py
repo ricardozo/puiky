@@ -288,7 +288,7 @@ def list_transactions(
         stmt = stmt.where(Transaction.fecha >= desde)
     if hasta is not None:
         stmt = stmt.where(Transaction.fecha <= hasta)
-    stmt = stmt.order_by(Transaction.fecha.desc())
+    stmt = stmt.order_by(Transaction.fecha.desc(), Transaction.creado.desc())
     return list(db.execute(stmt).scalars().all())
 
 
@@ -448,7 +448,7 @@ def _tx_export_query(
         stmt = stmt.where(Transaction.fecha >= desde)
     if hasta is not None:
         stmt = stmt.where(Transaction.fecha <= hasta)
-    return list(db.execute(stmt.order_by(Transaction.fecha.desc())).scalars().all())
+    return list(db.execute(stmt.order_by(Transaction.fecha.desc(), Transaction.creado.desc())).scalars().all())
 
 
 def export_transactions_xlsx(

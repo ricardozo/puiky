@@ -1,10 +1,10 @@
 """Modelos del dominio de finanzas: Account, Category, Transaction, Budget."""
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import UUID, Boolean, Date, ForeignKey, Index, Numeric, String, text
+from sqlalchemy import UUID, Boolean, Date, DateTime, ForeignKey, Index, Numeric, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -78,6 +78,10 @@ class Transaction(Base):
     )
     fecha: Mapped[date] = mapped_column(Date, nullable=False)
     nota: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Cuándo se registró (no la fecha contable): ordena los del mismo día.
+    creado: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
 
 
 class Budget(Base):

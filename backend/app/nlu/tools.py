@@ -736,7 +736,7 @@ def _listar_movimientos(db: Session, a: dict) -> dict:
 
 def _eliminar_ultimo_movimiento(db: Session, a: dict) -> dict:
     tx = db.execute(
-        select(Transaction).order_by(Transaction.fecha.desc()).limit(1)
+        select(Transaction).order_by(Transaction.fecha.desc(), Transaction.creado.desc()).limit(1)
     ).scalar_one_or_none()
     if tx is None:
         raise ValueError("No hay movimientos para eliminar.")
