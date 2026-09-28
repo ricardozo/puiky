@@ -524,14 +524,31 @@ export function TaskEditor({
             onBlur={() => titulo.trim() && guardar({ titulo: titulo.trim() })}
             className="flex-1 bg-transparent font-serif text-xl outline-none"
           />
+          {task.estado !== 'terminada' && (
+            <button
+              onClick={() =>
+                guardar({ foco_fecha: task.foco_fecha === hoyISO() ? null : hoyISO() })
+              }
+              title={
+                task.foco_fecha === hoyISO()
+                  ? 'Quitar del foco de hoy'
+                  : 'Poner en el foco de hoy'
+              }
+              className={`text-xl leading-none transition ${
+                task.foco_fecha === hoyISO() ? 'text-brand' : 'text-faint hover:text-brand'
+              }`}
+            >
+              {task.foco_fecha === hoyISO() ? '★' : '☆'}
+            </button>
+          )}
           <button onClick={onClose} className="text-faint hover:text-ink">
             ✕
           </button>
         </div>
 
-        <div className="flex items-center gap-3 text-sm">
+        <div className="flex flex-wrap items-center gap-3 text-sm">
           <span className="pill pill-mute">{task.estado}</span>
-          <span className="text-muted">{task.avance_pct}% avance</span>
+          <span className="text-muted whitespace-nowrap">{task.avance_pct}% avance</span>
           {task.estado !== 'terminada' && (
             <button
               onClick={alternarTiempo}
@@ -542,7 +559,7 @@ export function TaskEditor({
                     ? `Iniciar aquí (cierra «${actual.tarea}»)`
                     : 'Iniciar tiempo en esta tarea'
               }
-              className={`btn-ghost btn ml-auto text-sm py-1.5 tabular-nums ${
+              className={`btn-ghost btn ml-auto text-sm py-1.5 tabular-nums whitespace-nowrap ${
                 corriendo ? 'border-[color:var(--c-teal)] text-ink' : ''
               }`}
             >
@@ -556,7 +573,7 @@ export function TaskEditor({
           ) : (
             <button
               onClick={completar}
-              className="btn text-sm py-1.5"
+              className="btn text-sm py-1.5 whitespace-nowrap"
               style={{ background: 'var(--c-green)', color: '#fff' }}
             >
               Marcar completada
