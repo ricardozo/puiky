@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNo
 import { useNavigate } from 'react-router-dom'
 import { api, type Project, type Task, type TimeEntry } from '../api'
 import { TaskEditor } from './Board'
+import { fmtCrono, pomoMin } from '../tiempo'
 
 function hoyISO(): string {
   const d = new Date()
@@ -27,23 +28,7 @@ function vencimiento(t: Task): { texto: string; clase: string } {
 
 type Grupo = { proyecto: Project; tareas: Task[] }
 
-// Mismo pomodoro que la pantalla Tiempo (preferencia guardada en el navegador).
-const pomoMin = () => {
-  try {
-    const v = Number(localStorage.getItem('puiky_pomodoro_min'))
-    return v >= 5 && v <= 240 ? v : 45
-  } catch {
-    return 45
-  }
-}
 
-const p2 = (n: number) => String(n).padStart(2, '0')
-function fmtCrono(seg: number): string {
-  const h = Math.floor(seg / 3600)
-  const m = Math.floor((seg % 3600) / 60)
-  const s = Math.floor(seg % 60)
-  return h > 0 ? `${h}:${p2(m)}:${p2(s)}` : `${m}:${p2(s)}`
-}
 
 export default function Tareas() {
   const navigate = useNavigate()

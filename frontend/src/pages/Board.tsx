@@ -17,7 +17,15 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { api, type ChecklistItem, type Note, type ProjectDetail, type Task } from '../api'
+import {
+  api,
+  type ChecklistItem,
+  type Note,
+  type ProjectDetail,
+  type Task,
+  type TimeEntry,
+} from '../api'
+import { fmtCrono, pomoMin } from '../tiempo'
 
 // Ítem de checklist arrastrable (agarra desde el mango ⠿, no desde el texto,
 // para no chocar con el checkbox ni el botón de borrar).
@@ -421,6 +429,8 @@ export function TaskEditor({
   onClose: () => void
 }) {
   const [task, setTask] = useState<Task>(taskInicial)
+  const [actual, setActual] = useState<TimeEntry | null>(null)
+  const [ahora, setAhora] = useState(Date.now())
   const [titulo, setTitulo] = useState(taskInicial.titulo)
   const [desc, setDesc] = useState(taskInicial.descripcion ?? '')
   const [notas, setNotas] = useState(taskInicial.notas ?? '')
@@ -475,6 +485,29 @@ export function TaskEditor({
 
   const done = task.checklist.filter((i) => i.hecho).length
 
+  useEffect(() => {
+    api.timeCurrent().then(setActual)
+  }, [])
+  useEffect(() => {
+    if (!actual) return
+    const t = setInterval(() => setAhora(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [actual])
+  const corriendo = actual?.task_id === task.id
+  const transcurrido = actual
+    ? Math.max(0, (ahora - new Date(actual.inicio).getTime()) / 1000)
+    : 0
+  // Iniciar aquí cierra la sesión que corra en otra tarea; parar no la completa.
+  const alternarTiempo = async () => {
+    if (corriendo) {
+      await api.timeStop()
+      setActual(null)
+    } else {
+      setActual(await api.timeStart(task.id, pomoMin()))
+      setAhora(Date.now())
+    }
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4"
@@ -499,6 +532,23 @@ export function TaskEditor({
         <div className="flex items-center gap-3 text-sm">
           <span className="pill pill-mute">{task.estado}</span>
           <span className="text-muted">{task.avance_pct}% avance</span>
+          {task.estado !== 'terminada' && (
+            <button
+              onClick={alternarTiempo}
+              title={
+                corriendo
+                  ? 'Parar el tiempo (no completa la tarea)'
+                  : actual
+                    ? `Iniciar aquí (cierra «${actual.tarea}»)`
+                    : 'Iniciar tiempo en esta tarea'
+              }
+              className={`btn-ghost btn ml-auto text-sm py-1.5 tabular-nums ${
+                corriendo ? 'border-[color:var(--c-teal)] text-ink' : ''
+              }`}
+            >
+              {corriendo ? `⏹ ${fmtCrono(transcurrido)}` : '▶ Iniciar tiempo'}
+            </button>
+          )}
           {task.estado === 'terminada' ? (
             <button onClick={reabrir} className="btn-ghost btn ml-auto text-sm py-1.5">
               Reabrir
@@ -506,7 +556,7 @@ export function TaskEditor({
           ) : (
             <button
               onClick={completar}
-              className="btn ml-auto text-sm py-1.5"
+              className="btn text-sm py-1.5"
               style={{ background: 'var(--c-green)', color: '#fff' }}
             >
               Marcar completada
