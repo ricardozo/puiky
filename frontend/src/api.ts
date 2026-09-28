@@ -111,6 +111,8 @@ export interface Task {
   fecha_inicio_real: string | null
   fecha_fin_real: string | null
   recurrencia: string | null
+  prioridad?: 'alta' | 'media' | 'baja' | null
+  foco_fecha?: string | null // = hoy: en el foco del día
   checklist: ChecklistItem[]
 }
 export interface TaskFechas {
@@ -122,6 +124,8 @@ export interface TaskFechas {
   fecha_inicio_real?: string | null
   fecha_fin_real?: string | null
   recurrencia?: string | null
+  prioridad?: 'alta' | 'media' | 'baja' | null
+  foco_fecha?: string | null
 }
 export interface ProjectDetail extends Project {
   tasks: Task[]

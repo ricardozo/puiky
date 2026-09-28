@@ -63,6 +63,7 @@ def _completar(task: Task) -> None:
     else:
         task.estado = TERMINADA
         task.avance_pct = 100
+    task.foco_fecha = None  # hecha: sale del foco del día
     _resolver_avisos(object_session(task), task.id)
 
 

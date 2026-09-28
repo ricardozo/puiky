@@ -56,6 +56,10 @@ class Task(Base):
     # Si está definida, al completar la tarea se reinicia y su fecha_limite avanza
     # al siguiente periodo. Gramática: diaria|semanal|mensual|...|cada_N_dias.
     recurrencia: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # alta / media / baja (NULL = sin definir).
+    prioridad: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    # Día en que se marcó como foco (⭐). Solo cuenta si es hoy: se limpia solo.
+    foco_fecha: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     project: Mapped["Project | None"] = relationship(  # noqa: F821
         back_populates="tasks"

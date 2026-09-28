@@ -3,6 +3,7 @@
 import uuid
 from datetime import date
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -58,6 +59,8 @@ class TaskUpdate(BaseModel):
     fecha_inicio_real: date | None = None
     fecha_fin_real: date | None = None
     recurrencia: str | None = Field(default=None, description=_AYUDA_REC)
+    prioridad: Literal["alta", "media", "baja"] | None = None
+    foco_fecha: date | None = None  # hoy = en el foco del día; null = fuera
 
     _v_rec = field_validator("recurrencia")(_validar_recurrencia_opcional)
 
@@ -109,4 +112,6 @@ class TaskOut(BaseModel):
     fecha_inicio_real: date | None
     fecha_fin_real: date | None
     recurrencia: str | None = None
+    prioridad: str | None = None
+    foco_fecha: date | None = None
     checklist: list[ChecklistItemOut] = []

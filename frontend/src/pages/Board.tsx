@@ -534,6 +534,20 @@ export function TaskEditor({
           )}
         </label>
 
+        <label className="text-xs text-muted flex flex-wrap items-center gap-2">
+          Prioridad
+          <select
+            value={task.prioridad ?? ''}
+            onChange={(e) => guardar({ prioridad: e.target.value || null })}
+            className="input w-auto py-1 text-sm"
+          >
+            <option value="">Sin definir</option>
+            <option value="alta">Alta</option>
+            <option value="media">Media</option>
+            <option value="baja">Baja</option>
+          </select>
+        </label>
+
         <label className="text-xs text-muted flex flex-col gap-1">
           Descripción
           <textarea

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type Project, type Task, type TimeEntry } from '../api'
 import { TaskEditor } from './Board'
@@ -57,6 +57,21 @@ export default function Tareas() {
   const [filtro, setFiltro] = useState('')
   const [actual, setActual] = useState<TimeEntry | null>(null)
   const [ahora, setAhora] = useState(Date.now())
+  const [vista, setVista] = useState<'proyecto' | 'foco'>(() => {
+    try {
+      return localStorage.getItem('puiky_tareas_vista') === 'foco' ? 'foco' : 'proyecto'
+    } catch {
+      return 'proyecto'
+    }
+  })
+  const cambiarVista = (v: 'proyecto' | 'foco') => {
+    setVista(v)
+    try {
+      localStorage.setItem('puiky_tareas_vista', v)
+    } catch {
+      // sin almacenamiento: la vista vale solo para esta visita
+    }
+  }
 
   const cargar = useCallback(async () => {
     const [ts, ps, cur] = await Promise.all([
@@ -165,6 +180,13 @@ export default function Tareas() {
     cargar()
   }
 
+  // ⭐ Foco del día: la marca guarda la fecha de hoy; mañana ya no cuenta.
+  const alternarFoco = async (t: Task) => {
+    const valor = t.foco_fecha === hoy ? null : hoy
+    setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, foco_fecha: valor } : x)))
+    await api.updateTask(t.id, { foco_fecha: valor })
+  }
+
   const crearPersonal = async (e: FormEvent) => {
     e.preventDefault()
     if (!nueva.trim()) return
@@ -200,12 +222,34 @@ export default function Tareas() {
             )}
           </p>
         </div>
-        <input
-          value={filtro}
-          onChange={(e) => setFiltro(e.target.value)}
-          placeholder="Filtrar…"
-          className="input w-40 py-1.5 text-sm"
-        />
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-lg border border-line overflow-hidden text-sm">
+            {(
+              [
+                ['proyecto', '📁 Por proyecto'],
+                ['foco', '🎯 Foco'],
+              ] as const
+            ).map(([v, label]) => (
+              <button
+                key={v}
+                onClick={() => cambiarVista(v)}
+                className={`px-3 py-1.5 transition ${
+                  vista === v
+                    ? 'bg-[var(--c-brand-soft)] text-brand font-medium'
+                    : 'text-muted hover:text-ink'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <input
+            value={filtro}
+            onChange={(e) => setFiltro(e.target.value)}
+            placeholder="Filtrar…"
+            className="input w-40 py-1.5 text-sm"
+          />
+        </div>
       </div>
 
       {actual && (
@@ -253,7 +297,34 @@ export default function Tareas() {
         <p className="text-sm text-[color:var(--c-green)]">{aviso}</p>
       )}
 
-      {grupos.map(({ proyecto, tareas }) => (
+      {vista === 'foco' && (
+        <VistaFoco
+          tareas={tasks.filter(
+            (t) =>
+              t.estado !== 'terminada' &&
+              (!filtro || t.titulo.toLowerCase().includes(filtro.toLowerCase()))
+          )}
+          hoy={hoy}
+          fila={(t) => (
+            <FilaTarea
+              key={t.id}
+              t={t}
+              hoy={hoy}
+              hecha={hechasAhora.has(t.id)}
+              conProyecto
+              corriendo={actual?.task_id === t.id}
+              transcurrido={transcurrido}
+              onCompletar={completar}
+              onReabrir={reabrir}
+              onAbrir={setAbierta}
+              onTiempo={alternarTiempo}
+              onFoco={alternarFoco}
+            />
+          )}
+        />
+      )}
+
+      {vista === 'proyecto' && grupos.map(({ proyecto, tareas }) => (
         <TarjetaProyecto
           key={proyecto.id}
           proyecto={proyecto}
@@ -265,6 +336,8 @@ export default function Tareas() {
           corriendoId={actual?.task_id ?? null}
           transcurrido={transcurrido}
           onTiempo={alternarTiempo}
+          onFoco={alternarFoco}
+          hoy={hoy}
           onCrear={async (titulo) => {
             await api.createTask(titulo, proyecto.id)
             cargar()
@@ -296,6 +369,8 @@ function TarjetaProyecto({
   corriendoId,
   transcurrido,
   onTiempo,
+  onFoco,
+  hoy,
   onCrear,
   onVerTablero,
 }: {
@@ -308,6 +383,8 @@ function TarjetaProyecto({
   corriendoId: string | null
   transcurrido: number
   onTiempo: (t: Task) => void
+  onFoco: (t: Task) => void
+  hoy: string
   onCrear: (titulo: string) => Promise<void>
   onVerTablero: () => void
 }) {
@@ -342,63 +419,21 @@ function TarjetaProyecto({
         <p className="text-faint text-sm px-4 py-3">Sin tareas activas.</p>
       ) : (
         <ul className="divide-y divide-[color:var(--c-line)]">
-          {tareas.map((t) => {
-            const hecha = t.estado === 'terminada' || hechasAhora.has(t.id)
-            const v = vencimiento(t)
-            const corriendo = corriendoId === t.id
-            return (
-              <li
-                key={t.id}
-                className="flex items-center gap-3 px-4 py-2.5"
-                style={
-                  corriendo
-                    ? { background: 'color-mix(in srgb, var(--c-teal) 12%, transparent)' }
-                    : undefined
-                }
-              >
-                <input
-                  type="checkbox"
-                  checked={hecha}
-                  onChange={() => (hecha ? onReabrir(t) : onCompletar(t))}
-                  className="size-4 accent-[color:var(--c-teal)] shrink-0 cursor-pointer"
-                  title={hecha ? 'Reabrir' : 'Marcar completada'}
-                />
-                <button
-                  onClick={() => onAbrir(t)}
-                  className="min-w-0 flex-1 text-left"
-                >
-                  <span className={hecha ? 'line-through text-faint' : ''}>
-                    {t.recurrencia && (
-                      <span title={`Recurrente: ${t.recurrencia}`}>🔁 </span>
-                    )}
-                    {t.titulo}
-                  </span>
-                  {t.checklist.length > 0 && (
-                    <span className="text-xs text-muted ml-2">
-                      ☑ {t.checklist.filter((i) => i.hecho).length}/
-                      {t.checklist.length}
-                    </span>
-                  )}
-                </button>
-                {!hecha && v.texto && (
-                  <span className={`shrink-0 text-xs ${v.clase}`}>{v.texto}</span>
-                )}
-                {!hecha && (
-                  <button
-                    onClick={() => onTiempo(t)}
-                    title={corriendo ? 'Parar el tiempo' : 'Iniciar tiempo en esta tarea'}
-                    className={`shrink-0 rounded-lg border px-2 py-0.5 text-xs tabular-nums transition ${
-                      corriendo
-                        ? 'border-[color:var(--c-teal)] text-ink'
-                        : 'border-line text-faint hover:text-ink hover:border-[color:var(--c-teal)]'
-                    }`}
-                  >
-                    {corriendo ? `⏹ ${fmtCrono(transcurrido)}` : '▶'}
-                  </button>
-                )}
-              </li>
-            )
-          })}
+          {tareas.map((t) => (
+            <FilaTarea
+              key={t.id}
+              t={t}
+              hoy={hoy}
+              hecha={t.estado === 'terminada' || hechasAhora.has(t.id)}
+              corriendo={corriendoId === t.id}
+              transcurrido={transcurrido}
+              onCompletar={onCompletar}
+              onReabrir={onReabrir}
+              onAbrir={onAbrir}
+              onTiempo={onTiempo}
+              onFoco={onFoco}
+            />
+          ))}
         </ul>
       )}
 
@@ -413,5 +448,183 @@ function TarjetaProyecto({
         </form>
       )}
     </section>
+  )
+}
+
+const PRIORIDAD: Record<string, { label: string; clase: string }> = {
+  alta: { label: 'alta', clase: 'text-[color:var(--c-danger)]' },
+  media: { label: 'media', clase: 'text-brand' },
+  baja: { label: 'baja', clase: 'text-faint' },
+}
+
+function FilaTarea({
+  t,
+  hoy,
+  hecha,
+  conProyecto = false,
+  corriendo,
+  transcurrido,
+  onCompletar,
+  onReabrir,
+  onAbrir,
+  onTiempo,
+  onFoco,
+}: {
+  t: Task
+  hoy: string
+  hecha: boolean
+  conProyecto?: boolean
+  corriendo: boolean
+  transcurrido: number
+  onCompletar: (t: Task) => void
+  onReabrir: (t: Task) => void
+  onAbrir: (t: Task) => void
+  onTiempo: (t: Task) => void
+  onFoco: (t: Task) => void
+}) {
+  const v = vencimiento(t)
+  const enFoco = t.foco_fecha === hoy
+  const prio = t.prioridad ? PRIORIDAD[t.prioridad] : null
+  return (
+    <li
+      className="flex items-center gap-3 px-4 py-2.5"
+      style={
+        corriendo
+          ? { background: 'color-mix(in srgb, var(--c-teal) 12%, transparent)' }
+          : undefined
+      }
+    >
+      <input
+        type="checkbox"
+        checked={hecha}
+        onChange={() => (hecha ? onReabrir(t) : onCompletar(t))}
+        className="size-4 accent-[color:var(--c-teal)] shrink-0 cursor-pointer"
+        title={hecha ? 'Reabrir' : 'Marcar completada'}
+      />
+      <button onClick={() => onAbrir(t)} className="min-w-0 flex-1 text-left">
+        <span className={hecha ? 'line-through text-faint' : ''}>
+          {t.recurrencia && <span title={`Recurrente: ${t.recurrencia}`}>🔁 </span>}
+          {t.titulo}
+        </span>
+        {conProyecto && t.proyecto && (
+          <span className="text-xs text-faint ml-2">· {t.proyecto}</span>
+        )}
+        {prio && !hecha && (
+          <span className={`text-xs ml-2 ${prio.clase}`} title="Prioridad">
+            ● {prio.label}
+          </span>
+        )}
+        {t.checklist.length > 0 && (
+          <span className="text-xs text-muted ml-2">
+            ☑ {t.checklist.filter((i) => i.hecho).length}/{t.checklist.length}
+          </span>
+        )}
+      </button>
+      {!hecha && v.texto && (
+        <span className={`shrink-0 text-xs ${v.clase}`}>{v.texto}</span>
+      )}
+      {!hecha && (
+        <button
+          onClick={() => onFoco(t)}
+          title={enFoco ? 'Quitar del foco de hoy' : 'Poner en el foco de hoy'}
+          className={`shrink-0 transition ${
+            enFoco ? 'text-brand' : 'text-faint hover:text-brand'
+          }`}
+        >
+          {enFoco ? '★' : '☆'}
+        </button>
+      )}
+      {!hecha && (
+        <button
+          onClick={() => onTiempo(t)}
+          title={corriendo ? 'Parar el tiempo' : 'Iniciar tiempo en esta tarea'}
+          className={`shrink-0 rounded-lg border px-2 py-0.5 text-xs tabular-nums transition ${
+            corriendo
+              ? 'border-[color:var(--c-teal)] text-ink'
+              : 'border-line text-faint hover:text-ink hover:border-[color:var(--c-teal)]'
+          }`}
+        >
+          {corriendo ? `⏹ ${fmtCrono(transcurrido)}` : '▶'}
+        </button>
+      )}
+    </li>
+  )
+}
+
+function Seccion({
+  titulo,
+  ayuda,
+  items,
+  fila,
+}: {
+  titulo: string
+  ayuda?: string
+  items: Task[]
+  fila: (t: Task) => ReactNode
+}) {
+  return (
+    <section className="card p-0 overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-line flex items-baseline justify-between gap-2">
+        <h3 className="font-medium">{titulo}</h3>
+        <span className="text-xs text-muted">{items.length}</span>
+      </div>
+      {items.length === 0 ? (
+        <p className="text-faint text-sm px-4 py-3">{ayuda ?? 'Nada aquí.'}</p>
+      ) : (
+        <ul className="divide-y divide-[color:var(--c-line)]">{items.map(fila)}</ul>
+      )}
+    </section>
+  )
+}
+
+// Vista 🎯 Foco: qué hacer ahora, mezclando proyectos. Cada tarea aparece en
+// una sola sección, la primera que le aplique.
+function VistaFoco({
+  tareas,
+  hoy,
+  fila,
+}: {
+  tareas: Task[]
+  hoy: string
+  fila: (t: Task) => ReactNode
+}) {
+  const porFecha = (a: Task, b: Task) =>
+    (a.fecha_limite ?? '9999-12-31').localeCompare(b.fecha_limite ?? '9999-12-31')
+  const peso = (t: Task) => (t.prioridad === 'alta' ? 0 : t.prioridad === 'media' ? 1 : 2)
+  const diasHasta = (f: string) =>
+    Math.round(
+      (new Date(f + 'T00:00').getTime() - new Date(hoy + 'T00:00').getTime()) / 86400000
+    )
+
+  const foco = tareas.filter((t) => t.foco_fecha === hoy).sort((a, b) => peso(a) - peso(b))
+  const fueraFoco = tareas.filter((t) => t.foco_fecha !== hoy)
+  const urgentes = fueraFoco
+    .filter((t) => t.fecha_limite && t.fecha_limite <= hoy)
+    .sort(porFecha)
+  const resto = fueraFoco.filter((t) => !(t.fecha_limite && t.fecha_limite <= hoy))
+  const importantes = resto.filter((t) => t.prioridad === 'alta').sort(porFecha)
+  const proximas = resto
+    .filter((t) => t.prioridad !== 'alta' && t.fecha_limite && diasHasta(t.fecha_limite) <= 3)
+    .sort(porFecha)
+
+  return (
+    <>
+      <Seccion
+        titulo="⭐ Foco de hoy"
+        ayuda="Marca con ☆ las 3–5 tareas que decides hacer hoy. Mañana arrancas limpio."
+        items={foco}
+        fila={fila}
+      />
+      <Seccion titulo="⏰ Vencidas y para hoy" items={urgentes} ayuda="Nada vencido 🎉" fila={fila} />
+      <Seccion
+        titulo="🔥 Prioridad alta"
+        items={importantes}
+        ayuda="Sin tareas de prioridad alta. Asígnala abriendo la tarea."
+        fila={fila}
+      />
+      {proximas.length > 0 && (
+        <Seccion titulo="📅 Próximos 3 días" items={proximas} fila={fila} />
+      )}
+    </>
   )
 }
