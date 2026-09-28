@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, type Project, type Task } from '../api'
+import { api, type Project, type Task, type TimeEntry } from '../api'
 import { TaskEditor } from './Board'
 
 function hoyISO(): string {
@@ -27,6 +27,24 @@ function vencimiento(t: Task): { texto: string; clase: string } {
 
 type Grupo = { proyecto: Project; tareas: Task[] }
 
+// Mismo pomodoro que la pantalla Tiempo (preferencia guardada en el navegador).
+const pomoMin = () => {
+  try {
+    const v = Number(localStorage.getItem('puiky_pomodoro_min'))
+    return v >= 5 && v <= 240 ? v : 45
+  } catch {
+    return 45
+  }
+}
+
+const p2 = (n: number) => String(n).padStart(2, '0')
+function fmtCrono(seg: number): string {
+  const h = Math.floor(seg / 3600)
+  const m = Math.floor((seg % 3600) / 60)
+  const s = Math.floor(seg % 60)
+  return h > 0 ? `${h}:${p2(m)}:${p2(s)}` : `${m}:${p2(s)}`
+}
+
 export default function Tareas() {
   const navigate = useNavigate()
   const [tasks, setTasks] = useState<Task[]>([])
@@ -37,13 +55,43 @@ export default function Tareas() {
   const [hechasAhora, setHechasAhora] = useState<Set<string>>(new Set())
   const [aviso, setAviso] = useState('')
   const [filtro, setFiltro] = useState('')
+  const [actual, setActual] = useState<TimeEntry | null>(null)
+  const [ahora, setAhora] = useState(Date.now())
 
   const cargar = useCallback(async () => {
-    const [ts, ps] = await Promise.all([api.listTasks(), api.listProjects()])
+    const [ts, ps, cur] = await Promise.all([
+      api.listTasks(),
+      api.listProjects(),
+      api.timeCurrent(),
+    ])
     setTasks(ts)
     setProjects(ps)
+    setActual(cur)
     setCargando(false)
   }, [])
+
+  // Tic del cronómetro mientras haya sesión corriendo.
+  useEffect(() => {
+    if (!actual) return
+    const t = setInterval(() => setAhora(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [actual])
+
+  const transcurrido = actual
+    ? Math.max(0, (ahora - new Date(actual.inicio).getTime()) / 1000)
+    : 0
+
+  // ▶ en otra tarea cierra la anterior (lo hace el servidor); ⏹ en la que
+  // corre la para. Cronometrar nunca completa la tarea.
+  const alternarTiempo = async (t: Task) => {
+    if (actual?.task_id === t.id) {
+      await api.timeStop()
+      setActual(null)
+    } else {
+      setActual(await api.timeStart(t.id, pomoMin()))
+      setAhora(Date.now())
+    }
+  }
 
   useEffect(() => {
     cargar()
@@ -160,6 +208,37 @@ export default function Tareas() {
         />
       </div>
 
+      {actual && (
+        <div
+          className="card px-4 py-3 flex items-center justify-between gap-3"
+          style={{
+            borderColor: 'color-mix(in srgb, var(--c-teal) 60%, var(--c-line))',
+          }}
+        >
+          <div className="min-w-0 text-sm">
+            <span className="text-muted">⏱ Trabajando en </span>
+            <span className="font-medium">{actual.tarea}</span>
+            {actual.proyecto && (
+              <span className="text-faint"> · {actual.proyecto}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <span className="font-serif text-xl tabular-nums">
+              {fmtCrono(transcurrido)}
+            </span>
+            <button
+              onClick={async () => {
+                await api.timeStop()
+                setActual(null)
+              }}
+              className="btn text-sm py-1"
+            >
+              ⏹ Parar
+            </button>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={crearPersonal} className="flex gap-2">
         <input
           value={nueva}
@@ -183,6 +262,9 @@ export default function Tareas() {
           onCompletar={completar}
           onReabrir={reabrir}
           onAbrir={setAbierta}
+          corriendoId={actual?.task_id ?? null}
+          transcurrido={transcurrido}
+          onTiempo={alternarTiempo}
           onCrear={async (titulo) => {
             await api.createTask(titulo, proyecto.id)
             cargar()
@@ -211,6 +293,9 @@ function TarjetaProyecto({
   onCompletar,
   onReabrir,
   onAbrir,
+  corriendoId,
+  transcurrido,
+  onTiempo,
   onCrear,
   onVerTablero,
 }: {
@@ -220,6 +305,9 @@ function TarjetaProyecto({
   onCompletar: (t: Task) => void
   onReabrir: (t: Task) => void
   onAbrir: (t: Task) => void
+  corriendoId: string | null
+  transcurrido: number
+  onTiempo: (t: Task) => void
   onCrear: (titulo: string) => Promise<void>
   onVerTablero: () => void
 }) {
@@ -257,8 +345,17 @@ function TarjetaProyecto({
           {tareas.map((t) => {
             const hecha = t.estado === 'terminada' || hechasAhora.has(t.id)
             const v = vencimiento(t)
+            const corriendo = corriendoId === t.id
             return (
-              <li key={t.id} className="flex items-center gap-3 px-4 py-2.5">
+              <li
+                key={t.id}
+                className="flex items-center gap-3 px-4 py-2.5"
+                style={
+                  corriendo
+                    ? { background: 'color-mix(in srgb, var(--c-teal) 12%, transparent)' }
+                    : undefined
+                }
+              >
                 <input
                   type="checkbox"
                   checked={hecha}
@@ -285,6 +382,19 @@ function TarjetaProyecto({
                 </button>
                 {!hecha && v.texto && (
                   <span className={`shrink-0 text-xs ${v.clase}`}>{v.texto}</span>
+                )}
+                {!hecha && (
+                  <button
+                    onClick={() => onTiempo(t)}
+                    title={corriendo ? 'Parar el tiempo' : 'Iniciar tiempo en esta tarea'}
+                    className={`shrink-0 rounded-lg border px-2 py-0.5 text-xs tabular-nums transition ${
+                      corriendo
+                        ? 'border-[color:var(--c-teal)] text-ink'
+                        : 'border-line text-faint hover:text-ink hover:border-[color:var(--c-teal)]'
+                    }`}
+                  >
+                    {corriendo ? `⏹ ${fmtCrono(transcurrido)}` : '▶'}
+                  </button>
                 )}
               </li>
             )
