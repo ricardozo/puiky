@@ -19,16 +19,9 @@ from app.models.responsibilities import Responsibility
 from app.models.tasks import Task
 from app.scheduler.notifier import Notifier
 from app.services import market as market_svc
+from app.services.reminders import texto_vencimiento, vivificar
 from app.services.finances import _gasto_del_mes, _rango_mes
 from app.timeutils import zona
-
-
-def _cuando(dias: int) -> str:
-    if dias <= 0:
-        return "hoy"
-    if dias == 1:
-        return "mañana"
-    return f"en {dias} días"
 
 
 def _existe_reminder(
@@ -71,7 +64,7 @@ def _generar_para(
             Reminder(
                 origen_tipo=tipo,
                 origen_id=origen_id,
-                texto=f"⏰ {etiqueta} «{nombre}» vence {_cuando(dias)}.",
+                texto=texto_vencimiento(etiqueta, nombre, fecha_venc, fecha_aviso),
                 disparar_en=disparar_en,
             )
         )
@@ -289,6 +282,7 @@ async def entregar_pendientes(
         .order_by(efectivo)
     ).scalars().all()
 
+    vivificar(db, list(due))
     for r in due:
         for chat_id in chat_ids:
             await notifier.send(chat_id, r.texto)

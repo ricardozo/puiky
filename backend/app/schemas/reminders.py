@@ -1,7 +1,7 @@
 """Schemas Pydantic del dominio de recordatorios."""
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -71,3 +71,5 @@ class ReminderOut(BaseModel):
     pospuesto_para: datetime | None
     resuelto: bool
     recurrencia: str | None = None
+    # Vencimiento real de la tarea/responsabilidad de origen (si aplica).
+    vence: date | None = None

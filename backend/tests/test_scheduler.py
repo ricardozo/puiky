@@ -1,13 +1,19 @@
 """Tests del scheduler que no requieren BD ni Telegram."""
 
 from app.config import Settings
-from app.scheduler.jobs import _cuando
+from datetime import date
+
+from app.services.reminders import texto_vencimiento
 
 
-def test_cuando() -> None:
-    assert _cuando(0) == "hoy"
-    assert _cuando(1) == "mañana"
-    assert _cuando(3) == "en 3 días"
+def test_texto_vencimiento_relativo_a_hoy() -> None:
+    hoy = date(2026, 9, 28)
+    t = lambda venc: texto_vencimiento("La tarea", "X", venc, hoy)  # noqa: E731
+    assert t(date(2026, 9, 28)) == "⏰ La tarea «X» vence hoy."
+    assert t(date(2026, 9, 29)) == "⏰ La tarea «X» vence mañana."
+    assert t(date(2026, 10, 1)) == "⏰ La tarea «X» vence en 3 días."
+    assert t(date(2026, 9, 27)) == "⏰ La tarea «X» venció ayer."
+    assert t(date(2026, 9, 22)) == "⏰ La tarea «X» venció hace 6 días."
 
 
 def test_anticipation_days_parse() -> None:

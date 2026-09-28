@@ -6,7 +6,7 @@ los datos y las operaciones.
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -44,8 +44,56 @@ def create_reminder(db: Session, data: ReminderCreate) -> Reminder:
     return reminder
 
 
+_ETIQUETAS = {"task": "La tarea", "responsibility": "La responsabilidad"}
+
+
+def texto_vencimiento(etiqueta: str, nombre: str, venc: date, hoy: date) -> str:
+    """Frase relativa a HOY («vence mañana», «venció hace 3 días»). Se
+    recalcula cada vez: un texto fijado al generar el aviso queda desfasado."""
+    dias = (venc - hoy).days
+    if dias == 0:
+        cuando = "vence hoy"
+    elif dias == 1:
+        cuando = "vence mañana"
+    elif dias > 1:
+        cuando = f"vence en {dias} días"
+    elif dias == -1:
+        cuando = "venció ayer"
+    else:
+        cuando = f"venció hace {-dias} días"
+    return f"⏰ {etiqueta} «{nombre}» {cuando}."
+
+
+def vivificar(db: Session, reminders: list[Reminder]) -> list[Reminder]:
+    """Actualiza el texto de los avisos atados a una tarea/responsabilidad
+    según su vencimiento ACTUAL y adjunta `vence` (la fecha real), para que
+    texto y color digan lo mismo. Los demás se dejan igual."""
+    from app.timeutils import now_local
+
+    hoy = now_local().date()
+    for r in reminders:
+        r.vence = None  # type: ignore[attr-defined]
+        if r.origen_tipo not in _ETIQUETAS or r.origen_id is None:
+            continue
+        origen = db.get(_MODELOS_ORIGEN[r.origen_tipo], r.origen_id)
+        if origen is None:
+            continue
+        if r.origen_tipo == "task":
+            nombre, venc = origen.titulo, origen.fecha_limite
+        else:
+            nombre, venc = origen.nombre, origen.proximo_venc
+        if venc is None:
+            continue
+        r.vence = venc  # type: ignore[attr-defined]
+        texto = texto_vencimiento(_ETIQUETAS[r.origen_tipo], nombre, venc, hoy)
+        if r.texto != texto:
+            r.texto = texto
+    return reminders
+
+
 def get_reminder(db: Session, reminder_id: uuid.UUID) -> Reminder | None:
-    return db.get(Reminder, reminder_id)
+    r = db.get(Reminder, reminder_id)
+    return vivificar(db, [r])[0] if r else None
 
 
 def list_reminders(
@@ -55,7 +103,7 @@ def list_reminders(
     if resuelto is not None:
         stmt = stmt.where(Reminder.resuelto.is_(resuelto))
     stmt = stmt.order_by(Reminder.disparar_en)
-    return list(db.execute(stmt).scalars().all())
+    return vivificar(db, list(db.execute(stmt).scalars().all()))
 
 
 def list_due(db: Session) -> list[Reminder]:
@@ -68,7 +116,7 @@ def list_due(db: Session) -> list[Reminder]:
         .where(Reminder.resuelto.is_(False), efectivo <= func.now())
         .order_by(efectivo)
     )
-    return list(db.execute(stmt).scalars().all())
+    return vivificar(db, list(db.execute(stmt).scalars().all()))
 
 
 def update_reminder(

@@ -211,6 +211,7 @@ export interface Reminder {
   pospuesto_para: string | null
   resuelto: boolean
   recurrencia: string | null
+  vence?: string | null // vencimiento real del origen (tarea/responsabilidad)
 }
 export interface Responsibility {
   id: string

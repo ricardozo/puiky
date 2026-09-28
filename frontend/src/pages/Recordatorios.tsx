@@ -341,8 +341,16 @@ export default function Recordatorios() {
             hoy0.setHours(0, 0, 0, 0)
             // «Vencido» de verdad: quedó de días anteriores. Lo de hoy es
             // simplemente lo que toca hoy.
-            const vencido = !r.resuelto && cuando.getTime() < hoy0.getTime()
-            const esHoy = !r.resuelto && !vencido && cuando.getTime() <= ahora
+            // Con origen (tarea/responsabilidad) manda su vencimiento real, no
+            // el momento en que sonó el aviso: si vence en 3 días, no es rojo.
+            const vence = r.vence ? new Date(r.vence + 'T00:00') : null
+            const vencido =
+              !r.resuelto &&
+              (vence ? vence < hoy0 : cuando.getTime() < hoy0.getTime())
+            const esHoy =
+              !r.resuelto &&
+              !vencido &&
+              (vence ? vence.getTime() === hoy0.getTime() : cuando.getTime() <= ahora)
             return (
               <li
                 key={r.id}
@@ -361,7 +369,19 @@ export default function Recordatorios() {
                     )}
                   </p>
                   <p className="text-xs mt-1">
-                    {vencido ? (
+                    {vence ? (
+                      vencido ? (
+                        <span className="text-[color:var(--c-danger)] font-medium">
+                          ⏰ venció el {vence.toLocaleDateString('es-CO')}
+                        </span>
+                      ) : esHoy ? (
+                        <span className="pill pill-warn">vence hoy</span>
+                      ) : (
+                        <span className="text-faint">
+                          vence el {vence.toLocaleDateString('es-CO')}
+                        </span>
+                      )
+                    ) : vencido ? (
                       <span className="text-[color:var(--c-danger)] font-medium">
                         ⏰ vencido · {cuando.toLocaleString('es-CO')}
                       </span>
