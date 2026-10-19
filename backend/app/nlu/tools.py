@@ -828,11 +828,13 @@ def _crear_responsabilidad(db: Session, a: dict) -> dict:
             monto=a.get("monto"),
             account_id=cuenta.id if cuenta else None,
             category_id=categoria.id if categoria else None,
+            cuotas_restantes=int(a["cuotas"]) if a.get("cuotas") else None,
         ),
     )
     return {
         "ok": True,
         "nombre": r.nombre,
+        "cuotas": r.cuotas_restantes,
         "proximo_venc": r.proximo_venc.isoformat(),
         "cuenta": cuenta.nombre if cuenta else None,
     }
@@ -1520,7 +1522,9 @@ TOOLS: list[Tool] = [
         "crear_responsabilidad",
         "Crea un compromiso de pago (arriendo, administración, una deuda). "
         "recurrencia: unica|diaria|semanal|mensual|bimestral|trimestral|anual|cada_N_dias "
-        "(unica = deuda de un solo pago; al pagarla desaparece). "
+        "(unica = deuda de un solo pago; al pagarla desaparece). cuotas opcional: "
+        "número de pagos (p. ej. «6 cuotas mensuales» → mensual + cuotas=6); al "
+        "pagar la última desaparece. "
         "proximo_venc en YYYY-MM-DD. Opcional: monto, y cuenta/categoria para que "
         "al pagarlo se registre el gasto en finanzas.",
         _p(
@@ -1531,6 +1535,7 @@ TOOLS: list[Tool] = [
                 "monto": _NUM,
                 "cuenta": _STR,
                 "categoria": _STR,
+                "cuotas": _NUM,
             },
             ["nombre", "recurrencia", "proximo_venc"],
         ),

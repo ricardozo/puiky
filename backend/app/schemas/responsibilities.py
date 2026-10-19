@@ -25,6 +25,8 @@ class ResponsibilityCreate(BaseModel):
     monto: Decimal | None = Field(default=None, ge=0)
     account_id: uuid.UUID | None = None
     category_id: uuid.UUID | None = None
+    # Número de pagos (p. ej. 6 cuotas). None = se repite indefinidamente.
+    cuotas_restantes: int | None = Field(default=None, ge=1, le=600)
 
     @field_validator("recurrencia")
     @classmethod
@@ -41,6 +43,7 @@ class ResponsibilityUpdate(BaseModel):
     monto: Decimal | None = Field(default=None, ge=0)
     account_id: uuid.UUID | None = None
     category_id: uuid.UUID | None = None
+    cuotas_restantes: int | None = Field(default=None, ge=1, le=600)
 
     @field_validator("recurrencia")
     @classmethod
@@ -68,6 +71,7 @@ class ResponsibilityOut(BaseModel):
     monto: Decimal | None
     account_id: uuid.UUID | None = None
     category_id: uuid.UUID | None = None
+    cuotas_restantes: int | None = None
     # Nombres para mostrar (los adjunta el servicio).
     cuenta: str | None = None
     categoria: str | None = None

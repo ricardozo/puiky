@@ -56,6 +56,7 @@ def create_responsibility(
         monto=data.monto,
         account_id=data.account_id,
         category_id=data.category_id,
+        cuotas_restantes=data.cuotas_restantes,
     )
     db.add(resp)
     db.commit()
@@ -106,10 +107,13 @@ def _resolver_avisos(db: Session, resp_id: uuid.UUID) -> None:
 
 
 def _cumplir(db: Session, resp: Responsibility) -> Responsibility:
-    """Avanza el vencimiento al siguiente periodo; si es única, la elimina.
-    Devuelve un objeto con los datos para responder (la única ya no está en bd)."""
+    """Avanza el vencimiento al siguiente periodo; si es única o era su última
+    cuota, la elimina. Devuelve un objeto con los datos para responder (si se
+    eliminó, ya no está en bd)."""
     _resolver_avisos(db, resp.id)
-    if resp.recurrencia == "unica":
+    if resp.cuotas_restantes is not None:
+        resp.cuotas_restantes -= 1
+    if resp.recurrencia == "unica" or resp.cuotas_restantes == 0:
         salida = SimpleNamespace(
             id=resp.id,
             nombre=resp.nombre,
@@ -118,6 +122,7 @@ def _cumplir(db: Session, resp: Responsibility) -> Responsibility:
             monto=resp.monto,
             account_id=resp.account_id,
             category_id=resp.category_id,
+            cuotas_restantes=0 if resp.cuotas_restantes == 0 else None,
         )
         _enriquecer(db, salida)  # type: ignore[arg-type]
         db.delete(resp)

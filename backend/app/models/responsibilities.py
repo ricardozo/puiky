@@ -4,7 +4,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import UUID, Date, ForeignKey, Index, Numeric, String, text
+from sqlalchemy import UUID, Date, ForeignKey, Index, Integer, Numeric, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -35,3 +35,5 @@ class Responsibility(Base):
     category_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("category.id", ondelete="SET NULL"), nullable=True
     )
+    # Pagos que faltan (NULL = indefinida). Al pagar la última, desaparece.
+    cuotas_restantes: Mapped[int | None] = mapped_column(Integer, nullable=True)

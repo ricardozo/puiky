@@ -42,6 +42,7 @@ export default function Responsabilidades() {
   const [monto, setMonto] = useState('')
   const [cuentaId, setCuentaId] = useState('')
   const [categoriaId, setCategoriaId] = useState('')
+  const [cuotas, setCuotas] = useState('')
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState('')
   const [cargando, setCargando] = useState(true)
@@ -95,13 +96,15 @@ export default function Responsabilidades() {
         venc,
         monto ? Number(monto) : null,
         cuentaId || null,
-        categoriaId || null
+        categoriaId || null,
+        recurrencia !== 'unica' && cuotas ? Number(cuotas) : null
       )
       setNombre('')
       setVenc('')
       setMonto('')
       setCuentaId('')
       setCategoriaId('')
+      setCuotas('')
       cargar()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al crear')
@@ -144,7 +147,8 @@ export default function Responsabilidades() {
       <h2 className="font-serif text-2xl">Responsabilidades</h2>
       <p className="text-sm text-muted">
         Compromisos de pago: los que se repiten (arriendo, administración) y los de
-        una sola vez (una deuda, con recurrencia «única»: al pagarla desaparece).
+        una sola vez (una deuda, con recurrencia «única»: al pagarla desaparece). Con
+        «cuotas» (p. ej. 6 pagos mensuales) desaparece al pagar la última.
         Si les pones cuenta y monto, al registrar el pago se crea el gasto en
         finanzas.
       </p>
@@ -183,6 +187,17 @@ export default function Responsabilidades() {
           placeholder="monto (opcional)"
           className="input w-40"
         />
+        {recurrencia !== 'unica' && (
+          <input
+            value={cuotas}
+            onChange={(e) => setCuotas(e.target.value)}
+            type="number"
+            min={1}
+            placeholder="cuotas (opcional)"
+            title="Número de pagos (p. ej. 6). Vacío = se repite sin fin."
+            className="input w-36"
+          />
+        )}
         <select
           value={cuentaId}
           onChange={(e) => setCuentaId(e.target.value)}
@@ -274,6 +289,14 @@ export default function Responsabilidades() {
                 <p className="font-medium">{r.nombre}</p>
                 <p className="text-xs text-muted mt-1">
                   {labelRec(r.recurrencia)} ·{' '}
+                  {r.cuotas_restantes != null && (
+                    <span className="text-brand">
+                      {r.cuotas_restantes === 1
+                        ? 'última cuota'
+                        : `faltan ${r.cuotas_restantes} cuotas`}{' '}
+                      ·{' '}
+                    </span>
+                  )}
                   {vencida ? (
                     <span className="text-[color:var(--c-danger)] font-medium">
                       ⏰ venció el{' '}
@@ -449,6 +472,9 @@ function EditorResponsabilidad({
   const [monto, setMonto] = useState(resp.monto ?? '')
   const [cuentaId, setCuentaId] = useState(resp.account_id ?? '')
   const [categoriaId, setCategoriaId] = useState(resp.category_id ?? '')
+  const [cuotas, setCuotas] = useState(
+    resp.cuotas_restantes != null ? String(resp.cuotas_restantes) : ''
+  )
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -468,6 +494,7 @@ function EditorResponsabilidad({
         monto: monto ? Number(monto) : null,
         account_id: cuentaId || null,
         category_id: categoriaId || null,
+        cuotas_restantes: recurrencia !== 'unica' && cuotas ? Number(cuotas) : null,
       })
       onGuardado()
     } catch (e) {
@@ -527,6 +554,20 @@ function EditorResponsabilidad({
             className="input"
           />
         </label>
+
+        {recurrencia !== 'unica' && (
+          <label className="text-xs text-muted flex flex-col gap-1">
+            Cuotas que faltan (vacío = se repite sin fin)
+            <input
+              type="number"
+              min={1}
+              value={cuotas}
+              onChange={(e) => setCuotas(e.target.value)}
+              placeholder="p. ej. 6"
+              className="input"
+            />
+          </label>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <label className="text-xs text-muted flex flex-col gap-1">

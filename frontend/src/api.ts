@@ -227,6 +227,7 @@ export interface Responsibility {
   category_id: string | null
   cuenta: string | null
   categoria: string | null
+  cuotas_restantes?: number | null
 }
 export interface ResponsibilityPayResult {
   responsabilidad: Responsibility
@@ -665,7 +666,8 @@ export const api = {
     proximoVenc: string,
     monto: number | null,
     accountId: string | null = null,
-    categoryId: string | null = null
+    categoryId: string | null = null,
+    cuotas: number | null = null
   ) =>
     request<Responsibility>('/responsibilities', {
       method: 'POST',
@@ -676,6 +678,7 @@ export const api = {
         monto,
         account_id: accountId,
         category_id: categoryId,
+        cuotas_restantes: cuotas,
       }),
     }),
   updateResponsibility: (
@@ -687,6 +690,7 @@ export const api = {
       monto?: number | null
       account_id?: string | null
       category_id?: string | null
+      cuotas_restantes?: number | null
     }
   ) =>
     request<Responsibility>(`/responsibilities/${id}`, {
