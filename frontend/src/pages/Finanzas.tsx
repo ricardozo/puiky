@@ -485,10 +485,20 @@ function PorCategoria({
     const d = new Date()
     return new Date(d.getFullYear(), d.getMonth(), 1)
   })
-  const desde = ymd(ref)
-  const hasta = ymd(new Date(ref.getFullYear(), ref.getMonth() + 1, 0)) // último día
+  const [modo, setModo] = useState<'mes' | 'rango'>('mes')
+  const [rDesde, setRDesde] = useState(inicioMes)
+  const [rHasta, setRHasta] = useState(hoyStr)
+  const desde = modo === 'mes' ? ymd(ref) : rDesde
+  const hasta =
+    modo === 'mes'
+      ? ymd(new Date(ref.getFullYear(), ref.getMonth() + 1, 0)) // último día
+      : rHasta
   const cambiarMes = (delta: number) =>
     setRef(new Date(ref.getFullYear(), ref.getMonth() + delta, 1))
+  const etiquetaPeriodo =
+    modo === 'mes'
+      ? etiquetaMes(ref).toLowerCase()
+      : `ese rango`
 
   const filas = useMemo(() => {
     const acumulado = new Map<string, number>()
@@ -507,36 +517,105 @@ function PorCategoria({
       .sort((a, b) => Math.abs(b.neto) - Math.abs(a.neto))
   }, [categories, transactions, desde, hasta])
 
+  // Totales del periodo (transferencias fuera: no son ingreso ni gasto real).
+  const totales = useMemo(() => {
+    let ingresos = 0
+    let gastos = 0
+    for (const t of transactions) {
+      if (t.fecha < desde || t.fecha > hasta) continue
+      if (t.tipo === 'ingreso') ingresos += Number(t.monto)
+      else if (t.tipo === 'gasto') gastos += Number(t.monto)
+    }
+    return { ingresos, gastos, balance: ingresos - gastos }
+  }, [transactions, desde, hasta])
+
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <h3 className="eyebrow">Por categoría</h3>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => cambiarMes(-1)}
-              className="rounded-lg border border-line px-2 py-0.5 text-muted hover:text-ink hover:bg-surface transition"
-              title="Mes anterior"
-            >
-              ◀
-            </button>
-            <span className="text-sm font-medium min-w-32 text-center">
-              {etiquetaMes(ref)}
-            </span>
-            <button
-              onClick={() => cambiarMes(1)}
-              className="rounded-lg border border-line px-2 py-0.5 text-muted hover:text-ink hover:bg-surface transition"
-              title="Mes siguiente"
-            >
-              ▶
-            </button>
+          <div className="flex rounded-lg border border-line overflow-hidden text-xs">
+            {(
+              [
+                ['mes', 'Mes'],
+                ['rango', 'Rango'],
+              ] as const
+            ).map(([v, label]) => (
+              <button
+                key={v}
+                onClick={() => setModo(v)}
+                className={`px-2.5 py-1 transition ${
+                  modo === v
+                    ? 'bg-[var(--c-brand-soft)] text-brand font-medium'
+                    : 'text-muted hover:text-ink'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
+          {modo === 'mes' ? (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => cambiarMes(-1)}
+                className="rounded-lg border border-line px-2 py-0.5 text-muted hover:text-ink hover:bg-surface transition"
+                title="Mes anterior"
+              >
+                ◀
+              </button>
+              <span className="text-sm font-medium min-w-32 text-center">
+                {etiquetaMes(ref)}
+              </span>
+              <button
+                onClick={() => cambiarMes(1)}
+                className="rounded-lg border border-line px-2 py-0.5 text-muted hover:text-ink hover:bg-surface transition"
+                title="Mes siguiente"
+              >
+                ▶
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 text-xs text-muted">
+              <input
+                type="date"
+                value={rDesde}
+                onChange={(e) => setRDesde(e.target.value)}
+                className="input w-auto py-1 text-sm"
+              />
+              a
+              <input
+                type="date"
+                value={rHasta}
+                onChange={(e) => setRHasta(e.target.value)}
+                className="input w-auto py-1 text-sm"
+              />
+            </div>
+          )}
         </div>
         <span className="text-xs text-faint">clic para ver el detalle</span>
       </div>
+      {modo === 'rango' && rDesde > rHasta && (
+        <p className={`${rojo} text-sm`}>La fecha inicial es posterior a la final.</p>
+      )}
+      {(totales.ingresos > 0 || totales.gastos > 0) && (
+        <div className="card px-4 py-3 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 text-sm">
+          <span className="text-muted">
+            Ingresos <span className={verde}>+${fmtMoney(totales.ingresos)}</span>
+          </span>
+          <span className="text-muted">
+            Gastos <span className={rojo}>−${fmtMoney(totales.gastos)}</span>
+          </span>
+          <span className="font-medium">
+            Balance{' '}
+            <span className={`font-serif text-lg ${totales.balance >= 0 ? verde : rojo}`}>
+              {totales.balance >= 0 ? '+' : '−'}${fmtMoney(Math.abs(totales.balance))}
+            </span>
+          </span>
+        </div>
+      )}
       {filas.length === 0 ? (
         <p className="text-faint text-sm">
-          Sin movimientos con categoría en {etiquetaMes(ref).toLowerCase()}.
+          Sin movimientos con categoría en {etiquetaPeriodo}.
         </p>
       ) : (
         <div className="grid gap-2 sm:grid-cols-2">
